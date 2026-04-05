@@ -103,17 +103,32 @@
 <div class="details-container" id="details-view">
     <h2 id="country-title">Top 10 Constituents</h2>
     <div id="table-content">
-        <div class="empty-state">Click on a country on the map to view its top 10 largest companies.</div>
+        <div class="empty-state">Click on a country or marker on the map to view its top 10 largest companies.</div>
     </div>
 </div>
 
 <script>
-    // Internal mapping to handle Plotly (3-digit) vs your JSON (2-digit)
     const isoMapping = {
-        "AF": "AFG", "AX": "ALA", "AL": "ALB", "DZ": "DZA", "AS": "ASM", "AD": "AND", "AO": "AGO", "AI": "AIA", "AQ": "ATA", "AG": "ATG", "AR": "ARG", "AM": "ARM", "AW": "ABW", "AU": "AUS", "AT": "AUT", "AZ": "AZE", "BS": "BHS", "BH": "BHR", "BD": "BGD", "BB": "BRB", "BY": "BLR", "BE": "BEL", "BZ": "BLZ", "BJ": "BEN", "BM": "BMU", "BT": "BTN", "BO": "BOL", "BA": "BIH", "BW": "BWA", "BV": "BVT", "BR": "BRA", "IO": "IOT", "BN": "BRN", "BG": "BGR", "BF": "BFA", "BI": "BDI", "KH": "KHM", "CM": "CMR", "CA": "CAN", "CV": "CPV", "KY": "CYM", "CF": "CAF", "TD": "TCD", "CL": "CHL", "CN": "CHN", "CX": "CXR", "CC": "CCK", "CO": "COL", "KM": "COM", "CG": "COG", "CD": "COD", "CK": "COK", "CR": "CRI", "CI": "CIV", "HR": "HRV", "CU": "CUB", "CY": "CYP", "CZ": "CZE", "DK": "DNK", "DJ": "DJI", "DM": "DMA", "DO": "DOM", "EC": "ECU", "EG": "EGY", "SV": "SLV", "GQ": "GNQ", "ER": "ERI", "EE": "EST", "ET": "ETH", "FK": "FLK", "FO": "FRO", "FJ": "FJI", "FI": "FIN", "FR": "FRA", "GF": "GUF", "PF": "PYF", "TF": "ATF", "GA": "GAB", "GM": "GMB", "GE": "GEO", "DE": "DEU", "GH": "GHA", "GI": "GIB", "GR": "GRC", "GL": "GRL", "GD": "GRD", "GP": "GLP", "GU": "GUM", "GT": "GTM", "GG": "GGY", "GN": "GIN", "GW": "GNB", "GY": "GUY", "HT": "HTI", "HM": "HMD", "VA": "VAT", "HN": "HND", "HK": "HKG", "HU": "HUN", "IS": "ISL", "IN": "IND", "ID": "IDN", "IR": "IRN", "IQ": "IRQ", "IE": "IRL", "IM": "IMN", "IL": "ISR", "IT": "ITA", "JM": "JAM", "JP": "JPN", "JE": "JEY", "JO": "JOR", "KZ": "KAZ", "KE": "KEN", "KI": "KIR", "KP": "PRK", "KR": "KOR", "KW": "KWT", "KG": "KGZ", "LA": "LAO", "LV": "LVA", "LB": "LBN", "LS": "LSO", "LR": "LBR", "LY": "LBY", "LI": "LIE", "LT": "LTU", "LU": "LUX", "MO": "MAC", "MK": "MKD", "MG": "MDG", "MW": "MWI", "MY": "MYS", "MV": "MDV", "ML": "MLI", "MT": "MLT", "MH": "MHL", "MQ": "MTQ", "MR": "MRT", "MU": "MUS", "YT": "MYT", "MX": "MEX", "FM": "FSM", "MD": "MDA", "MC": "MCO", "MN": "MNG", "ME": "MNE", "MS": "MSR", "MA": "MAR", "MZ": "MOZ", "MM": "MMR", "NA": "NAM", "NR": "NRU", "NP": "NPL", "NL": "NLD", "AN": "ANT", "NC": "NCL", "NZ": "NZL", "NI": "NIC", "NE": "NER", "NG": "NGA", "NU": "NIU", "NF": "NFK", "MP": "MNP", "NO": "NOR", "OM": "OMN", "PK": "PAK", "PW": "PLW", "PS": "PSE", "PA": "PAN", "PG": "PNG", "PY": "PRY", "PE": "PER", "PH": "PHL", "PN": "PCN", "PL": "POL", "PT": "PRT", "PR": "PRI", "QA": "QAT", "RE": "REU", "RO": "ROU", "RU": "RUS", "RW": "RWA", "SH": "SHN", "KN": "KNA", "LC": "LCA", "PM": "SPM", "VC": "VCT", "WS": "WSM", "SM": "SMR", "ST": "STP", "SA": "SAU", "SN": "SEN", "RS": "SRB", "SC": "SYC", "SL": "SLE", "SG": "SGP", "SK": "SVK", "SI": "SVN", "SB": "SLB", "SO": "SOM", "ZA": "ZAF", "GS": "SGS", "ES": "ESP", "LK": "LKA", "SD": "SDN", "SR": "SUR", "SJ": "SJM", "SZ": "SWZ", "SE": "SWE", "CH": "CHE", "SY": "SYR", "TW": "TWN", "TJ": "TJK", "TZ": "TZA", "TH": "THA", "TL": "TLS", "TG": "TGO", "TK": "TKL", "TO": "TON", "TT": "TTO", "TN": "TUN", "TR": "TUR", "TM": "TKM", "TC": "TCA", "TV": "TUV", "UG": "UGA", "UA": "UKR", "AE": "ARE", "GB": "GBR", "US": "USA", "UM": "UMI", "UY": "URY", "UZ": "UZB", "VU": "VUT", "VE": "VEN", "VN": "VNM", "VG": "VGB", "VI": "VIR", "WF": "WLF", "EH": "ESH", "YE": "YEM", "ZM": "ZMB", "ZW": "ZWE"
+        "AU": "AUS", "AT": "AUT", "BE": "BEL", "BR": "BRA", "CA": "CAN", "CL": "CHL", 
+        "CN": "CHN", "CO": "COL", "CZ": "CZE", "DK": "DNK", "EG": "EGY", "FI": "FIN", 
+        "FR": "FRA", "DE": "DEU", "GR": "GRC", "HK": "HKG", "HU": "HUN", "IS": "ISL", 
+        "IN": "IND", "ID": "IDN", "IE": "IRL", "IL": "ISR", "IT": "ITA", "JP": "JPN", 
+        "KR": "KOR", "KW": "KWT", "MY": "MYS", "MX": "MEX", "NL": "NLD", "NZ": "NZL", 
+        "NO": "NOR", "PH": "PHL", "PL": "POL", "PT": "PRT", "QA": "QAT", "RO": "ROU", 
+        "SA": "SAU", "SG": "SGP", "ZA": "ZAF", "ES": "ESP", "SE": "SWE", "CH": "CHE", 
+        "TW": "TWN", "TH": "THA", "TR": "TUR", "AE": "ARE", "GB": "GBR", "US": "USA"
     };
 
-    // --- CHANGE 2: UPDATED WEIGHTS (using 2-digit keys for simplicity) ---
+    // Coordinates for "Small Markets" that are hard to click on a standard map
+    const smallMarketCoords = {
+        "HK": { lat: 22.3, lon: 114.1, name: "Hong Kong" },
+        "SG": { lat: 1.35, lon: 103.8, name: "Singapore" },
+        "IL": { lat: 31.0, lon: 34.8, name: "Israel" },
+        "QA": { lat: 25.3, lon: 51.1, name: "Qatar" },
+        "KW": { lat: 29.3, lon: 47.4, name: "Kuwait" },
+        "AE": { lat: 23.4, lon: 53.8, name: "UAE" }
+    };
+
     const weightData2D = {
         "AU": 1.69, "AT": 0.09, "BE": 0.27, "BR": 0.53, "CA": 3.23, "CL": 0.07,
         "CN": 3.15, "CO": 0.02, "CZ": 0.01, "DK": 0.38, "EG": 0.01, "FI": 0.27,
@@ -125,21 +140,29 @@
         "TW": 2.62, "TH": 0.18, "TR": 0.11, "AE": 0.16, "GB": 3.41, "US": 61.61
     };
 
-    // Prepare data for Plotly (converts 2D keys to 3D locations)
+    // Prepare main choropleth data
     const locations = [];
     const weights = [];
     const hoverTexts = [];
-    
     for (const [code2, weight] of Object.entries(weightData2D)) {
         const code3 = isoMapping[code2];
         if (code3) {
             locations.push(code3);
             weights.push(weight);
-            hoverTexts.push(`${code2} - Weight: ${weight}%`);
+            hoverTexts.push(`${code2}: ${weight}%`);
         }
     }
 
-    // --- CHANGE 3: COMPANY DATA (Paste your full list of dictionaries here) ---
+    // Prepare "Small Markets" markers
+    const smLat = [], smLon = [], smText = [], smCode2 = [];
+    for (const [code2, coords] of Object.entries(smallMarketCoords)) {
+        smLat.push(coords.lat);
+        smLon.push(coords.lon);
+        smText.push(`${coords.name}: ${weightData2D[code2]}%`);
+        smCode2.push(code2);
+    }
+
+    // --- PASTE YOUR JSON ARRAY HERE ---
     const companyList = [
         {"Company":"Emaar Properties PJSC","% OF FUNDS*":"0.02%","Industry":"Real Estate Development","COUNTRY":"AE","RANK_WITHIN_COUNTRY":1},
 {"Company":"First Abu Dhabi Bank PJSC","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"AE","RANK_WITHIN_COUNTRY":2},
@@ -605,24 +628,33 @@
 {"Company":"Harmony Gold Mining Co Ltd","% OF FUNDS*":"0.01%","Industry":"Gold","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":10}
     ];
 
-    // Plotly Config
-    const data = [{
+    const trace1 = {
         type: 'choropleth',
         locations: locations,
         z: weights,
         text: hoverTexts,
         hoverinfo: 'text',
-        colorscale: [
-            [0, '#e3f2fd'],
-            [0.005, '#bbdefb'], // Light blue for small weights
-            [0.05, '#64b5f6'],
-            [0.1, '#2196f3'],
-            [1, '#0d47a1']     // Dark blue for USA
-        ],
+        colorscale: [[0, '#e3f2fd'], [0.005, '#bbdefb'], [0.05, '#64b5f6'], [0.1, '#2196f3'], [1, '#0d47a1']],
         autocolorscale: false,
         marker: { line: { color: 'white', width: 0.5 } },
-        colorbar: { title: 'Weight %', thickness: 15, len: 0.5 }
-    }];
+        colorbar: { title: 'Weight %', thickness: 15, len: 0.5 },
+        customdata: Object.keys(weightData2D) // Store the 2-digit code for click logic
+    };
+
+    const trace2 = {
+        type: 'scattergeo',
+        lat: smLat,
+        lon: smLon,
+        mode: 'markers',
+        text: smText,
+        hoverinfo: 'text',
+        marker: {
+            size: 10,
+            color: '#1a365d',
+            line: { color: 'white', width: 1 }
+        },
+        customdata: smCode2 // Store the 2-digit code for click logic
+    };
 
     const layout = {
         geo: {
@@ -635,55 +667,46 @@
         margin: { l: 0, r: 0, t: 0, b: 0 }
     };
 
-    Plotly.newPlot('map-container', data, layout, { responsive: true, displayModeBar: false });
+    Plotly.newPlot('map-container', [trace1, trace2], layout, { responsive: true, displayModeBar: false });
 
-    // Click Event Handler
+    // Universal Click Handler
     document.getElementById('map-container').on('plotly_click', function(data) {
-        const iso3 = data.points[0].location;
-        // Reverse lookup: Find 2-digit code from 3-digit code
-        const iso2 = Object.keys(isoMapping).find(key => isoMapping[key] === iso3);
+        let iso2 = "";
         
-        if (iso2) {
-            updateCompanyTable(iso2);
+        // If clicking a bubble (scattergeo)
+        if (data.points[0].data.type === 'scattergeo') {
+            iso2 = data.points[0].customdata;
+        } 
+        // If clicking a country polygon (choropleth)
+        else {
+            const iso3 = data.points[0].location;
+            iso2 = Object.keys(isoMapping).find(key => isoMapping[key] === iso3);
         }
+        
+        if (iso2) updateCompanyTable(iso2);
     });
 
     function updateCompanyTable(iso2) {
         const container = document.getElementById('table-content');
         const title = document.getElementById('country-title');
         
-        // Filter the user's pasted list
         const filtered = companyList.filter(c => c.COUNTRY === iso2)
                                     .sort((a, b) => a.RANK_WITHIN_COUNTRY - b.RANK_WITHIN_COUNTRY)
                                     .slice(0, 10);
 
-        title.innerText = `Top 10 Constituents: ${iso2}`;
+        title.innerText = `Top Constituents: ${iso2}`;
 
         if (filtered.length === 0) {
-            container.innerHTML = `<div class="empty-state">No company data found for ${iso2} in the provided list.</div>`;
+            container.innerHTML = `<div class="empty-state">No company data found for ${iso2} in your list.</div>`;
             return;
         }
 
-        let html = `<table><thead><tr>
-            <th>Rank</th>
-            <th>Company</th>
-            <th>Industry</th>
-            <th>% of Total Index</th>
-        </tr></thead><tbody>`;
-
+        let html = `<table><thead><tr><th>Rank</th><th>Company</th><th>Industry</th><th>% of Total Index</th></tr></thead><tbody>`;
         filtered.forEach(item => {
-            html += `<tr>
-                <td>${item.RANK_WITHIN_COUNTRY}</td>
-                <td><strong>${item.Company}</strong></td>
-                <td>${item.Industry}</td>
-                <td>${item["% OF FUNDS*"]}</td>
-            </tr>`;
+            html += `<tr><td>${item.RANK_WITHIN_COUNTRY}</td><td><strong>${item.Company}</strong></td><td>${item.Industry}</td><td>${item["% OF FUNDS*"]}</td></tr>`;
         });
-
         html += `</tbody></table>`;
         container.innerHTML = html;
-        
-        // Auto-scroll to table on mobile
         document.getElementById('details-view').scrollIntoView({ behavior: 'smooth' });
     }
 

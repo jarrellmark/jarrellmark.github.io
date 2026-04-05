@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FTSE Global All Cap Index Visualization</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f9;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            background-color: #1a365d;
+            color: white;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .controls {
+            background: #fff;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        button {
+            padding: 10px 20px;
+            border: 2px solid #1a365d;
+            background: white;
+            color: #1a365d;
+            cursor: pointer;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        button.active {
+            background: #1a365d;
+            color: white;
+        }
+        #map-container {
+            width: 100%;
+            height: 550px;
+            background-color: white;
+        }
+        .info-panel {
+            background: white;
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+        }
+        .legend-item { display: flex; align-items: center; margin: 5px 15px; }
+        .color-box { width: 18px; height: 18px; margin-right: 8px; border-radius: 3px; }
+        
+        .details-container {
+            max-width: 1100px;
+            margin: 20px auto;
+            width: 95%;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            min-height: 300px;
+        }
+        h2 { color: #1a365d; border-bottom: 2px solid #f0f4f8; padding-bottom: 15px; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { text-align: left; background: #f8fafc; padding: 12px; color: #4a5568; font-size: 0.8rem; text-transform: uppercase; }
+        td { padding: 12px; border-bottom: 1px solid #edf2f7; font-size: 0.9rem; color: #2d3748; }
+        tr:hover { background-color: #f7fafc; }
+        .empty-state { text-align: center; color: #a0aec0; padding: 60px 0; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>FTSE Global All Cap Index</h1>
+    <p>Market Capitalization Weight & Top Constituents</p>
+</header>
+
+<div class="controls">
+    <button id="btn-equal" class="active" onclick="setProjection('equal earth', 'btn-equal')">Flat Map</button>
+    <button id="btn-ortho" onclick="setProjection('orthographic', 'btn-ortho')">Globe View</button>
+</div>
+
+<div id="map-container"></div>
+
+<div class="info-panel">
+    <div class="legend-item"><div class="color-box" style="background-color: #0d47a1;"></div><span>USA (61.6%)</span></div>
+    <div class="legend-item"><div class="color-box" style="background-color: #2196f3;"></div><span>Developed (>1%)</span></div>
+    <div class="legend-item"><div class="color-box" style="background-color: #bbdefb;"></div><span>Emerging/Small (<1%)</span></div>
+    <div class="legend-item"><div class="color-box" style="background-color: #e2e8f0; border: 1px solid #cbd5e0;"></div><span>Not in Index</span></div>
+</div>
+
+<div class="details-container" id="details-view">
+    <h2 id="country-title">Top 10 Constituents</h2>
+    <div id="table-content">
+        <div class="empty-state">Click on a country on the map to view its top 10 largest companies.</div>
+    </div>
+</div>
+
+<script>
+    // Internal mapping to handle Plotly (3-digit) vs your JSON (2-digit)
+    const isoMapping = {
+        "AF": "AFG", "AX": "ALA", "AL": "ALB", "DZ": "DZA", "AS": "ASM", "AD": "AND", "AO": "AGO", "AI": "AIA", "AQ": "ATA", "AG": "ATG", "AR": "ARG", "AM": "ARM", "AW": "ABW", "AU": "AUS", "AT": "AUT", "AZ": "AZE", "BS": "BHS", "BH": "BHR", "BD": "BGD", "BB": "BRB", "BY": "BLR", "BE": "BEL", "BZ": "BLZ", "BJ": "BEN", "BM": "BMU", "BT": "BTN", "BO": "BOL", "BA": "BIH", "BW": "BWA", "BV": "BVT", "BR": "BRA", "IO": "IOT", "BN": "BRN", "BG": "BGR", "BF": "BFA", "BI": "BDI", "KH": "KHM", "CM": "CMR", "CA": "CAN", "CV": "CPV", "KY": "CYM", "CF": "CAF", "TD": "TCD", "CL": "CHL", "CN": "CHN", "CX": "CXR", "CC": "CCK", "CO": "COL", "KM": "COM", "CG": "COG", "CD": "COD", "CK": "COK", "CR": "CRI", "CI": "CIV", "HR": "HRV", "CU": "CUB", "CY": "CYP", "CZ": "CZE", "DK": "DNK", "DJ": "DJI", "DM": "DMA", "DO": "DOM", "EC": "ECU", "EG": "EGY", "SV": "SLV", "GQ": "GNQ", "ER": "ERI", "EE": "EST", "ET": "ETH", "FK": "FLK", "FO": "FRO", "FJ": "FJI", "FI": "FIN", "FR": "FRA", "GF": "GUF", "PF": "PYF", "TF": "ATF", "GA": "GAB", "GM": "GMB", "GE": "GEO", "DE": "DEU", "GH": "GHA", "GI": "GIB", "GR": "GRC", "GL": "GRL", "GD": "GRD", "GP": "GLP", "GU": "GUM", "GT": "GTM", "GG": "GGY", "GN": "GIN", "GW": "GNB", "GY": "GUY", "HT": "HTI", "HM": "HMD", "VA": "VAT", "HN": "HND", "HK": "HKG", "HU": "HUN", "IS": "ISL", "IN": "IND", "ID": "IDN", "IR": "IRN", "IQ": "IRQ", "IE": "IRL", "IM": "IMN", "IL": "ISR", "IT": "ITA", "JM": "JAM", "JP": "JPN", "JE": "JEY", "JO": "JOR", "KZ": "KAZ", "KE": "KEN", "KI": "KIR", "KP": "PRK", "KR": "KOR", "KW": "KWT", "KG": "KGZ", "LA": "LAO", "LV": "LVA", "LB": "LBN", "LS": "LSO", "LR": "LBR", "LY": "LBY", "LI": "LIE", "LT": "LTU", "LU": "LUX", "MO": "MAC", "MK": "MKD", "MG": "MDG", "MW": "MWI", "MY": "MYS", "MV": "MDV", "ML": "MLI", "MT": "MLT", "MH": "MHL", "MQ": "MTQ", "MR": "MRT", "MU": "MUS", "YT": "MYT", "MX": "MEX", "FM": "FSM", "MD": "MDA", "MC": "MCO", "MN": "MNG", "ME": "MNE", "MS": "MSR", "MA": "MAR", "MZ": "MOZ", "MM": "MMR", "NA": "NAM", "NR": "NRU", "NP": "NPL", "NL": "NLD", "AN": "ANT", "NC": "NCL", "NZ": "NZL", "NI": "NIC", "NE": "NER", "NG": "NGA", "NU": "NIU", "NF": "NFK", "MP": "MNP", "NO": "NOR", "OM": "OMN", "PK": "PAK", "PW": "PLW", "PS": "PSE", "PA": "PAN", "PG": "PNG", "PY": "PRY", "PE": "PER", "PH": "PHL", "PN": "PCN", "PL": "POL", "PT": "PRT", "PR": "PRI", "QA": "QAT", "RE": "REU", "RO": "ROU", "RU": "RUS", "RW": "RWA", "SH": "SHN", "KN": "KNA", "LC": "LCA", "PM": "SPM", "VC": "VCT", "WS": "WSM", "SM": "SMR", "ST": "STP", "SA": "SAU", "SN": "SEN", "RS": "SRB", "SC": "SYC", "SL": "SLE", "SG": "SGP", "SK": "SVK", "SI": "SVN", "SB": "SLB", "SO": "SOM", "ZA": "ZAF", "GS": "SGS", "ES": "ESP", "LK": "LKA", "SD": "SDN", "SR": "SUR", "SJ": "SJM", "SZ": "SWZ", "SE": "SWE", "CH": "CHE", "SY": "SYR", "TW": "TWN", "TJ": "TJK", "TZ": "TZA", "TH": "THA", "TL": "TLS", "TG": "TGO", "TK": "TKL", "TO": "TON", "TT": "TTO", "TN": "TUN", "TR": "TUR", "TM": "TKM", "TC": "TCA", "TV": "TUV", "UG": "UGA", "UA": "UKR", "AE": "ARE", "GB": "GBR", "US": "USA", "UM": "UMI", "UY": "URY", "UZ": "UZB", "VU": "VUT", "VE": "VEN", "VN": "VNM", "VG": "VGB", "VI": "VIR", "WF": "WLF", "EH": "ESH", "YE": "YEM", "ZM": "ZMB", "ZW": "ZWE"
+    };
+
+    // --- CHANGE 2: UPDATED WEIGHTS (using 2-digit keys for simplicity) ---
+    const weightData2D = {
+        "AU": 1.69, "AT": 0.09, "BE": 0.27, "BR": 0.53, "CA": 3.23, "CL": 0.07,
+        "CN": 3.15, "CO": 0.02, "CZ": 0.01, "DK": 0.38, "EG": 0.01, "FI": 0.27,
+        "FR": 2.09, "DE": 1.88, "GR": 0.07, "HK": 0.5, "HU": 0.04, "IS": 0.01,
+        "IN": 1.69, "ID": 0.12, "IE": 0.08, "IL": 0.34, "IT": 0.77, "JP": 5.81,
+        "KR": 1.82, "KW": 0.08, "MY": 0.2, "MX": 0.24, "NL": 1.03, "NZ": 0.06,
+        "NO": 0.23, "PH": 0.05, "PL": 0.14, "PT": 0.05, "QA": 0.07, "RO": 0.01,
+        "SA": 0.37, "SG": 0.36, "ZA": 0.42, "ES": 0.82, "SE": 0.79, "CH": 2.03,
+        "TW": 2.62, "TH": 0.18, "TR": 0.11, "AE": 0.16, "GB": 3.41, "US": 61.61
+    };
+
+    // Prepare data for Plotly (converts 2D keys to 3D locations)
+    const locations = [];
+    const weights = [];
+    const hoverTexts = [];
+    
+    for (const [code2, weight] of Object.entries(weightData2D)) {
+        const code3 = isoMapping[code2];
+        if (code3) {
+            locations.push(code3);
+            weights.push(weight);
+            hoverTexts.push(`${code2} - Weight: ${weight}%`);
+        }
+    }
+
+    // --- CHANGE 3: COMPANY DATA (Paste your full list of dictionaries here) ---
+    const companyList = [
+        {"Company":"Emaar Properties PJSC","% OF FUNDS*":"0.02%","Industry":"Real Estate Development","COUNTRY":"AE","RANK_WITHIN_COUNTRY":1},
+{"Company":"First Abu Dhabi Bank PJSC","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"AE","RANK_WITHIN_COUNTRY":2},
+{"Company":"Emirates Telecommunications Group Co PJSC","% OF FUNDS*":"0.02%","Industry":"Integrated Telecommunication Services","COUNTRY":"AE","RANK_WITHIN_COUNTRY":3},
+{"Company":"Emirates NBD Bank PJSC","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"AE","RANK_WITHIN_COUNTRY":4},
+{"Company":"Abu Dhabi Commercial Bank PJSC","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"AE","RANK_WITHIN_COUNTRY":5},
+{"Company":"Aldar Properties PJSC","% OF FUNDS*":"0.01%","Industry":"Diversified Real Estate Activities","COUNTRY":"AE","RANK_WITHIN_COUNTRY":6},
+{"Company":"Abu Dhabi Islamic Bank PJSC","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"AE","RANK_WITHIN_COUNTRY":7},
+{"Company":"Dubai Electricity & Water Authority PJSC","% OF FUNDS*":"<0.01%","Industry":"Multi-Utilities","COUNTRY":"AE","RANK_WITHIN_COUNTRY":8},
+{"Company":"Dubai Islamic Bank PJSC","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"AE","RANK_WITHIN_COUNTRY":9},
+{"Company":"Adnoc Gas PLC","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Refining & Marketing","COUNTRY":"AE","RANK_WITHIN_COUNTRY":10},
+{"Company":"Erste Group Bank AG","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"AT","RANK_WITHIN_COUNTRY":1},
+{"Company":"BAWAG Group AG","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"AT","RANK_WITHIN_COUNTRY":2},
+{"Company":"OMV AG","% OF FUNDS*":"<0.01%","Industry":"Integrated Oil & Gas","COUNTRY":"AT","RANK_WITHIN_COUNTRY":3},
+{"Company":"voestalpine AG","% OF FUNDS*":"<0.01%","Industry":"Steel","COUNTRY":"AT","RANK_WITHIN_COUNTRY":4},
+{"Company":"Raiffeisen Bank International AG","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"AT","RANK_WITHIN_COUNTRY":5},
+{"Company":"ANDRITZ AG","% OF FUNDS*":"<0.01%","Industry":"Industrial Machinery & Supplies & Components","COUNTRY":"AT","RANK_WITHIN_COUNTRY":6},
+{"Company":"Verbund AG","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"AT","RANK_WITHIN_COUNTRY":7},
+{"Company":"Wienerberger AG","% OF FUNDS*":"<0.01%","Industry":"Construction Materials","COUNTRY":"AT","RANK_WITHIN_COUNTRY":8},
+{"Company":"Vienna Insurance Group AG Wiener Versicherung Gruppe","% OF FUNDS*":"<0.01%","Industry":"Multi-line Insurance","COUNTRY":"AT","RANK_WITHIN_COUNTRY":9},
+{"Company":"Strabag SE","% OF FUNDS*":"<0.01%","Industry":"Construction & Engineering","COUNTRY":"AT","RANK_WITHIN_COUNTRY":10},
+{"Company":"Commonwealth Bank of Australia","% OF FUNDS*":"0.19%","Industry":"Diversified Banks","COUNTRY":"AU","RANK_WITHIN_COUNTRY":1},
+{"Company":"BHP Group Ltd","% OF FUNDS*":"0.18%","Industry":"Diversified Metals & Mining","COUNTRY":"AU","RANK_WITHIN_COUNTRY":2},
+{"Company":"National Australia Bank Ltd","% OF FUNDS*":"0.10%","Industry":"Diversified Banks","COUNTRY":"AU","RANK_WITHIN_COUNTRY":3},
+{"Company":"Westpac Banking Corp","% OF FUNDS*":"0.09%","Industry":"Diversified Banks","COUNTRY":"AU","RANK_WITHIN_COUNTRY":4},
+{"Company":"ANZ Group Holdings Ltd","% OF FUNDS*":"0.08%","Industry":"Diversified Banks","COUNTRY":"AU","RANK_WITHIN_COUNTRY":5},
+{"Company":"Wesfarmers Ltd","% OF FUNDS*":"0.06%","Industry":"Broadline Retail","COUNTRY":"AU","RANK_WITHIN_COUNTRY":6},
+{"Company":"Macquarie Group Ltd","% OF FUNDS*":"0.05%","Industry":"Diversified Capital Markets","COUNTRY":"AU","RANK_WITHIN_COUNTRY":7},
+{"Company":"CSL Ltd","% OF FUNDS*":"0.05%","Industry":"Biotechnology","COUNTRY":"AU","RANK_WITHIN_COUNTRY":8},
+{"Company":"Rio Tinto Ltd","% OF FUNDS*":"0.04%","Industry":"Diversified Metals & Mining","COUNTRY":"AU","RANK_WITHIN_COUNTRY":9},
+{"Company":"GOODMAN GROUP","% OF FUNDS*":"0.04%","Industry":"Industrial REITs","COUNTRY":"AU","RANK_WITHIN_COUNTRY":10},
+{"Company":"Anheuser-Busch InBev SA/NV","% OF FUNDS*":"0.07%","Industry":"Brewers","COUNTRY":"BE","RANK_WITHIN_COUNTRY":1},
+{"Company":"Argenx SE","% OF FUNDS*":"0.04%","Industry":"Biotechnology","COUNTRY":"BE","RANK_WITHIN_COUNTRY":2},
+{"Company":"UCB SA","% OF FUNDS*":"0.03%","Industry":"Pharmaceuticals","COUNTRY":"BE","RANK_WITHIN_COUNTRY":3},
+{"Company":"KBC Group NV","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"BE","RANK_WITHIN_COUNTRY":4},
+{"Company":"Ageas SA/NV","% OF FUNDS*":"0.01%","Industry":"Multi-line Insurance","COUNTRY":"BE","RANK_WITHIN_COUNTRY":5},
+{"Company":"Groupe Bruxelles Lambert NV","% OF FUNDS*":"<0.01%","Industry":"Multi-Sector Holdings","COUNTRY":"BE","RANK_WITHIN_COUNTRY":6},
+{"Company":"Ackermans & van Haaren NV","% OF FUNDS*":"<0.01%","Industry":"Construction & Engineering","COUNTRY":"BE","RANK_WITHIN_COUNTRY":7},
+{"Company":"Elia Group SA/NV","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"BE","RANK_WITHIN_COUNTRY":8},
+{"Company":"Warehouses De Pauw CVA","% OF FUNDS*":"<0.01%","Industry":"Industrial REITs","COUNTRY":"BE","RANK_WITHIN_COUNTRY":9},
+{"Company":"Financiere de Tubize SA","% OF FUNDS*":"<0.01%","Industry":"Pharmaceuticals","COUNTRY":"BE","RANK_WITHIN_COUNTRY":10},
+{"Company":"Vale SA","% OF FUNDS*":"0.06%","Industry":"Steel","COUNTRY":"BR","RANK_WITHIN_COUNTRY":1},
+{"Company":"ITAU UNIBANCO HOLDING S-PREF","% OF FUNDS*":"0.04%","Industry":"Diversified Banks","COUNTRY":"BR","RANK_WITHIN_COUNTRY":2},
+{"Company":"PETROBRAS - PETROLEO BRAS-PR","% OF FUNDS*":"0.03%","Industry":"Integrated Oil & Gas","COUNTRY":"BR","RANK_WITHIN_COUNTRY":3},
+{"Company":"Petroleo Brasileiro SA - Petrobras","% OF FUNDS*":"0.02%","Industry":"Integrated Oil & Gas","COUNTRY":"BR","RANK_WITHIN_COUNTRY":4},
+{"Company":"B3 SA - Brasil Bolsa Balcao","% OF FUNDS*":"0.02%","Industry":"Financial Exchanges & Data","COUNTRY":"BR","RANK_WITHIN_COUNTRY":5},
+{"Company":"BANCO BRADESCO SA-PREF","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"BR","RANK_WITHIN_COUNTRY":6},
+{"Company":"ITAUSA SA - PREFERRED SHARES","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"BR","RANK_WITHIN_COUNTRY":7},
+{"Company":"Banco BTG Pactual SA","% OF FUNDS*":"0.01%","Industry":"Diversified Capital Markets","COUNTRY":"BR","RANK_WITHIN_COUNTRY":8},
+{"Company":"WEG SA","% OF FUNDS*":"0.01%","Industry":"Electrical Components & Equipment","COUNTRY":"BR","RANK_WITHIN_COUNTRY":9},
+{"Company":"Axia Energia","% OF FUNDS*":"0.01%","Industry":"Electric Utilities","COUNTRY":"BR","RANK_WITHIN_COUNTRY":10},
+{"Company":"Royal Bank of Canada","% OF FUNDS*":"0.21%","Industry":"Diversified Banks","COUNTRY":"CA","RANK_WITHIN_COUNTRY":1},
+{"Company":"Toronto-Dominion Bank/The","% OF FUNDS*":"0.15%","Industry":"Diversified Banks","COUNTRY":"CA","RANK_WITHIN_COUNTRY":2},
+{"Company":"Shopify Inc","% OF FUNDS*":"0.13%","Industry":"Internet Services & Infrastructure","COUNTRY":"CA","RANK_WITHIN_COUNTRY":3},
+{"Company":"Agnico Eagle Mines Ltd","% OF FUNDS*":"0.11%","Industry":"Gold","COUNTRY":"CA","RANK_WITHIN_COUNTRY":4},
+{"Company":"Enbridge Inc","% OF FUNDS*":"0.10%","Industry":"Oil & Gas Storage & Transportation","COUNTRY":"CA","RANK_WITHIN_COUNTRY":5},
+{"Company":"Bank of Montreal","% OF FUNDS*":"0.09%","Industry":"Diversified Banks","COUNTRY":"CA","RANK_WITHIN_COUNTRY":6},
+{"Company":"Canadian Imperial Bank of Commerce","% OF FUNDS*":"0.08%","Industry":"Diversified Banks","COUNTRY":"CA","RANK_WITHIN_COUNTRY":7},
+{"Company":"Bank of Nova Scotia/The","% OF FUNDS*":"0.08%","Industry":"Diversified Banks","COUNTRY":"CA","RANK_WITHIN_COUNTRY":8},
+{"Company":"Brookfield Corp","% OF FUNDS*":"0.08%","Industry":"Asset Management & Custody Banks","COUNTRY":"CA","RANK_WITHIN_COUNTRY":9},
+{"Company":"Canadian Natural Resources Ltd","% OF FUNDS*":"0.08%","Industry":"Oil & Gas Exploration & Production","COUNTRY":"CA","RANK_WITHIN_COUNTRY":10},
+{"Company":"Novartis AG","% OF FUNDS*":"0.29%","Industry":"Pharmaceuticals","COUNTRY":"CH","RANK_WITHIN_COUNTRY":1},
+{"Company":"Roche Holding AG","% OF FUNDS*":"0.27%","Industry":"Pharmaceuticals","COUNTRY":"CH","RANK_WITHIN_COUNTRY":2},
+{"Company":"Nestle SA","% OF FUNDS*":"0.25%","Industry":"Packaged Foods & Meats","COUNTRY":"CH","RANK_WITHIN_COUNTRY":3},
+{"Company":"ABB Ltd","% OF FUNDS*":"0.13%","Industry":"Electrical Components & Equipment","COUNTRY":"CH","RANK_WITHIN_COUNTRY":4},
+{"Company":"UBS Group AG","% OF FUNDS*":"0.12%","Industry":"Diversified Capital Markets","COUNTRY":"CH","RANK_WITHIN_COUNTRY":5},
+{"Company":"Cie Financiere Richemont SA","% OF FUNDS*":"0.10%","Industry":"Apparel, Accessories & Luxury Goods","COUNTRY":"CH","RANK_WITHIN_COUNTRY":6},
+{"Company":"Zurich Insurance Group AG","% OF FUNDS*":"0.10%","Industry":"Multi-line Insurance","COUNTRY":"CH","RANK_WITHIN_COUNTRY":7},
+{"Company":"Swiss Re AG","% OF FUNDS*":"0.05%","Industry":"Reinsurance","COUNTRY":"CH","RANK_WITHIN_COUNTRY":8},
+{"Company":"Lonza Group AG","% OF FUNDS*":"0.04%","Industry":"Life Sciences Tools & Services","COUNTRY":"CH","RANK_WITHIN_COUNTRY":9},
+{"Company":"Roche Holding AG","% OF FUNDS*":"0.04%","Industry":"Pharmaceuticals","COUNTRY":"CH","RANK_WITHIN_COUNTRY":10},
+{"Company":"SOC QUIMICA Y MINERA CHILE-B","% OF FUNDS*":"<0.01%","Industry":"Specialty Chemicals","COUNTRY":"CL","RANK_WITHIN_COUNTRY":1},
+{"Company":"Banco de Chile","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CL","RANK_WITHIN_COUNTRY":2},
+{"Company":"Falabella SA","% OF FUNDS*":"<0.01%","Industry":"Broadline Retail","COUNTRY":"CL","RANK_WITHIN_COUNTRY":3},
+{"Company":"Latam Airlines Group SA","% OF FUNDS*":"<0.01%","Industry":"Passenger Airlines","COUNTRY":"CL","RANK_WITHIN_COUNTRY":4},
+{"Company":"Banco de Credito e Inversiones SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CL","RANK_WITHIN_COUNTRY":5},
+{"Company":"Cencosud SA","% OF FUNDS*":"<0.01%","Industry":"Consumer Staples Merchandise Retail","COUNTRY":"CL","RANK_WITHIN_COUNTRY":6},
+{"Company":"Banco Santander Chile","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CL","RANK_WITHIN_COUNTRY":7},
+{"Company":"Plaza SA","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"CL","RANK_WITHIN_COUNTRY":8},
+{"Company":"Parque Arauco SA","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"CL","RANK_WITHIN_COUNTRY":9},
+{"Company":"Empresas Copec SA","% OF FUNDS*":"<0.01%","Industry":"Automotive Retail","COUNTRY":"CL","RANK_WITHIN_COUNTRY":10},
+{"Company":"Kweichow Moutai Co Ltd","% OF FUNDS*":"0.02%","Industry":"Distillers & Vintners","COUNTRY":"CN","RANK_WITHIN_COUNTRY":1},
+{"Company":"Contemporary Amperex Technology Co Ltd","% OF FUNDS*":"0.01%","Industry":"Electrical Components & Equipment","COUNTRY":"CN","RANK_WITHIN_COUNTRY":2},
+{"Company":"China Merchants Bank Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CN","RANK_WITHIN_COUNTRY":3},
+{"Company":"Ping An Insurance Group Co of China Ltd","% OF FUNDS*":"<0.01%","Industry":"Life & Health Insurance","COUNTRY":"CN","RANK_WITHIN_COUNTRY":4},
+{"Company":"Zijin Mining Group Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Gold","COUNTRY":"CN","RANK_WITHIN_COUNTRY":5},
+{"Company":"China Yangtze Power Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Renewable Electricity","COUNTRY":"CN","RANK_WITHIN_COUNTRY":6},
+{"Company":"Foxconn Industrial Internet Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Electronic Manufacturing Services","COUNTRY":"CN","RANK_WITHIN_COUNTRY":7},
+{"Company":"Zhongji Innolight Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Communications Equipment","COUNTRY":"CN","RANK_WITHIN_COUNTRY":8},
+{"Company":"Hygon Information Technology Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Semiconductors","COUNTRY":"CN","RANK_WITHIN_COUNTRY":9},
+{"Company":"Agricultural Bank of China Ltd","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CN","RANK_WITHIN_COUNTRY":10},
+{"Company":"Interconexion Electrica SA ESP","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"CO","RANK_WITHIN_COUNTRY":1},
+{"Company":"Cementos Argos SA","% OF FUNDS*":"<0.01%","Industry":"Construction Materials","COUNTRY":"CO","RANK_WITHIN_COUNTRY":2},
+{"Company":"GRUPO DE INV SURAMERICANA-PF","% OF FUNDS*":"<0.01%","Industry":"Multi-Sector Holdings","COUNTRY":"CO","RANK_WITHIN_COUNTRY":3},
+{"Company":"Ecopetrol SA","% OF FUNDS*":"<0.01%","Industry":"Integrated Oil & Gas","COUNTRY":"CO","RANK_WITHIN_COUNTRY":4},
+{"Company":"Grupo Cibest SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CO","RANK_WITHIN_COUNTRY":5},
+{"Company":"GRUPO CIBEST SA - PREF","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CO","RANK_WITHIN_COUNTRY":6},
+{"Company":"CEZ AS","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"CZ","RANK_WITHIN_COUNTRY":1},
+{"Company":"Komercni Banka AS","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CZ","RANK_WITHIN_COUNTRY":2},
+{"Company":"Moneta Money Bank AS","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"CZ","RANK_WITHIN_COUNTRY":3},
+{"Company":"Colt CZ Group SE","% OF FUNDS*":"<0.01%","Industry":"Aerospace & Defense","COUNTRY":"CZ","RANK_WITHIN_COUNTRY":4},
+{"Company":"Doosan Skoda Power as","% OF FUNDS*":"<0.01%","Industry":"Heavy Electrical Equipment","COUNTRY":"CZ","RANK_WITHIN_COUNTRY":5},
+{"Company":"Siemens AG","% OF FUNDS*":"0.19%","Industry":"Industrial Conglomerates","COUNTRY":"DE","RANK_WITHIN_COUNTRY":1},
+{"Company":"SAP SE","% OF FUNDS*":"0.19%","Industry":"Application Software","COUNTRY":"DE","RANK_WITHIN_COUNTRY":2},
+{"Company":"Allianz SE","% OF FUNDS*":"0.16%","Industry":"Multi-line Insurance","COUNTRY":"DE","RANK_WITHIN_COUNTRY":3},
+{"Company":"Siemens Energy AG","% OF FUNDS*":"0.13%","Industry":"Heavy Electrical Equipment","COUNTRY":"DE","RANK_WITHIN_COUNTRY":4},
+{"Company":"Deutsche Telekom AG","% OF FUNDS*":"0.13%","Industry":"Integrated Telecommunication Services","COUNTRY":"DE","RANK_WITHIN_COUNTRY":5},
+{"Company":"Rheinmetall AG","% OF FUNDS*":"0.08%","Industry":"Aerospace & Defense","COUNTRY":"DE","RANK_WITHIN_COUNTRY":6},
+{"Company":"Muenchener Rueckversicherungs-Gesellschaft AG in Muenchen","% OF FUNDS*":"0.08%","Industry":"Reinsurance","COUNTRY":"DE","RANK_WITHIN_COUNTRY":7},
+{"Company":"Infineon Technologies AG","% OF FUNDS*":"0.06%","Industry":"Semiconductors","COUNTRY":"DE","RANK_WITHIN_COUNTRY":8},
+{"Company":"Deutsche Bank AG","% OF FUNDS*":"0.06%","Industry":"Diversified Capital Markets","COUNTRY":"DE","RANK_WITHIN_COUNTRY":9},
+{"Company":"Deutsche Post AG","% OF FUNDS*":"0.05%","Industry":"Air Freight & Logistics","COUNTRY":"DE","RANK_WITHIN_COUNTRY":10},
+{"Company":"Novo Nordisk A/S","% OF FUNDS*":"0.11%","Industry":"Pharmaceuticals","COUNTRY":"DK","RANK_WITHIN_COUNTRY":1},
+{"Company":"DSV A/S","% OF FUNDS*":"0.04%","Industry":"Air Freight & Logistics","COUNTRY":"DK","RANK_WITHIN_COUNTRY":2},
+{"Company":"Danske Bank A/S","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"DK","RANK_WITHIN_COUNTRY":3},
+{"Company":"Vestas Wind Systems A/S","% OF FUNDS*":"0.02%","Industry":"Heavy Electrical Equipment","COUNTRY":"DK","RANK_WITHIN_COUNTRY":4},
+{"Company":"Novonesis Novozymes B","% OF FUNDS*":"0.02%","Industry":"Specialty Chemicals","COUNTRY":"DK","RANK_WITHIN_COUNTRY":5},
+{"Company":"Genmab A/S","% OF FUNDS*":"0.02%","Industry":"Biotechnology","COUNTRY":"DK","RANK_WITHIN_COUNTRY":6},
+{"Company":"Carlsberg AS","% OF FUNDS*":"0.01%","Industry":"Brewers","COUNTRY":"DK","RANK_WITHIN_COUNTRY":7},
+{"Company":"Coloplast A/S","% OF FUNDS*":"<0.01%","Industry":"Health Care Supplies","COUNTRY":"DK","RANK_WITHIN_COUNTRY":8},
+{"Company":"Orsted AS","% OF FUNDS*":"<0.01%","Industry":"Renewable Electricity","COUNTRY":"DK","RANK_WITHIN_COUNTRY":9},
+{"Company":"AP Moller - Maersk A/S","% OF FUNDS*":"<0.01%","Industry":"Marine Transportation","COUNTRY":"DK","RANK_WITHIN_COUNTRY":10},
+{"Company":"Commercial International Bank - Egypt (CIB)","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"EG","RANK_WITHIN_COUNTRY":1},
+{"Company":"Talaat Moustafa Group","% OF FUNDS*":"<0.01%","Industry":"Real Estate Development","COUNTRY":"EG","RANK_WITHIN_COUNTRY":2},
+{"Company":"Eastern Co SAE","% OF FUNDS*":"<0.01%","Industry":"Tobacco","COUNTRY":"EG","RANK_WITHIN_COUNTRY":3},
+{"Company":"Telecom Egypt Co","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"EG","RANK_WITHIN_COUNTRY":4},
+{"Company":"EFG Holding S.A.E.","% OF FUNDS*":"<0.01%","Industry":"Investment Banking & Brokerage","COUNTRY":"EG","RANK_WITHIN_COUNTRY":5},
+{"Company":"Fawry for Banking & Payment Technology Services SAE","% OF FUNDS*":"<0.01%","Industry":"Transaction & Payment Processing Services","COUNTRY":"EG","RANK_WITHIN_COUNTRY":6},
+{"Company":"Banco Santander SA","% OF FUNDS*":"0.17%","Industry":"Diversified Banks","COUNTRY":"ES","RANK_WITHIN_COUNTRY":1},
+{"Company":"Iberdrola SA","% OF FUNDS*":"0.14%","Industry":"Electric Utilities","COUNTRY":"ES","RANK_WITHIN_COUNTRY":2},
+{"Company":"Banco Bilbao Vizcaya Argentaria SA","% OF FUNDS*":"0.12%","Industry":"Diversified Banks","COUNTRY":"ES","RANK_WITHIN_COUNTRY":3},
+{"Company":"Industria de Diseno Textil SA","% OF FUNDS*":"0.07%","Industry":"Apparel Retail","COUNTRY":"ES","RANK_WITHIN_COUNTRY":4},
+{"Company":"CaixaBank SA","% OF FUNDS*":"0.04%","Industry":"Diversified Banks","COUNTRY":"ES","RANK_WITHIN_COUNTRY":5},
+{"Company":"Ferrovial SE","% OF FUNDS*":"0.03%","Industry":"Construction & Engineering","COUNTRY":"ES","RANK_WITHIN_COUNTRY":6},
+{"Company":"Amadeus IT Group SA","% OF FUNDS*":"0.02%","Industry":"Hotels, Resorts & Cruise Lines","COUNTRY":"ES","RANK_WITHIN_COUNTRY":7},
+{"Company":"Repsol SA","% OF FUNDS*":"0.02%","Industry":"Integrated Oil & Gas","COUNTRY":"ES","RANK_WITHIN_COUNTRY":8},
+{"Company":"ACS Actividades de Construccion y Servicios SA","% OF FUNDS*":"0.02%","Industry":"Construction & Engineering","COUNTRY":"ES","RANK_WITHIN_COUNTRY":9},
+{"Company":"Aena SME SA","% OF FUNDS*":"0.02%","Industry":"Airport Services","COUNTRY":"ES","RANK_WITHIN_COUNTRY":10},
+{"Company":"Nordea Bank Abp","% OF FUNDS*":"0.06%","Industry":"Diversified Banks","COUNTRY":"FI","RANK_WITHIN_COUNTRY":1},
+{"Company":"Nokia Oyj","% OF FUNDS*":"0.04%","Industry":"Communications Equipment","COUNTRY":"FI","RANK_WITHIN_COUNTRY":2},
+{"Company":"Sampo Oyj","% OF FUNDS*":"0.02%","Industry":"Property & Casualty Insurance","COUNTRY":"FI","RANK_WITHIN_COUNTRY":3},
+{"Company":"Kone Oyj","% OF FUNDS*":"0.02%","Industry":"Industrial Machinery & Supplies & Components","COUNTRY":"FI","RANK_WITHIN_COUNTRY":4},
+{"Company":"Wartsila OYJ Abp","% OF FUNDS*":"0.02%","Industry":"Industrial Machinery & Supplies & Components","COUNTRY":"FI","RANK_WITHIN_COUNTRY":5},
+{"Company":"UPM-Kymmene Oyj","% OF FUNDS*":"0.02%","Industry":"Paper Products","COUNTRY":"FI","RANK_WITHIN_COUNTRY":6},
+{"Company":"Metso Oyj","% OF FUNDS*":"0.01%","Industry":"Construction Machinery & Heavy Transportation Equipment","COUNTRY":"FI","RANK_WITHIN_COUNTRY":7},
+{"Company":"Neste Oyj","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Refining & Marketing","COUNTRY":"FI","RANK_WITHIN_COUNTRY":8},
+{"Company":"Elisa Oyj","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"FI","RANK_WITHIN_COUNTRY":9},
+{"Company":"Fortum Oyj","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"FI","RANK_WITHIN_COUNTRY":10},
+{"Company":"Schneider Electric SE","% OF FUNDS*":"0.16%","Industry":"Electrical Components & Equipment","COUNTRY":"FR","RANK_WITHIN_COUNTRY":1},
+{"Company":"LVMH Moet Hennessy Louis Vuitton SE","% OF FUNDS*":"0.15%","Industry":"Apparel, Accessories & Luxury Goods","COUNTRY":"FR","RANK_WITHIN_COUNTRY":2},
+{"Company":"TotalEnergies SE","% OF FUNDS*":"0.13%","Industry":"Integrated Oil & Gas","COUNTRY":"FR","RANK_WITHIN_COUNTRY":3},
+{"Company":"Safran SA","% OF FUNDS*":"0.13%","Industry":"Aerospace & Defense","COUNTRY":"FR","RANK_WITHIN_COUNTRY":4},
+{"Company":"Airbus SE","% OF FUNDS*":"0.11%","Industry":"Aerospace & Defense","COUNTRY":"FR","RANK_WITHIN_COUNTRY":5},
+{"Company":"BNP Paribas SA","% OF FUNDS*":"0.10%","Industry":"Diversified Banks","COUNTRY":"FR","RANK_WITHIN_COUNTRY":6},
+{"Company":"Sanofi SA","% OF FUNDS*":"0.09%","Industry":"Pharmaceuticals","COUNTRY":"FR","RANK_WITHIN_COUNTRY":7},
+{"Company":"Vinci SA","% OF FUNDS*":"0.07%","Industry":"Construction & Engineering","COUNTRY":"FR","RANK_WITHIN_COUNTRY":8},
+{"Company":"Hermes International SCA","% OF FUNDS*":"0.07%","Industry":"Apparel, Accessories & Luxury Goods","COUNTRY":"FR","RANK_WITHIN_COUNTRY":9},
+{"Company":"AXA SA","% OF FUNDS*":"0.07%","Industry":"Multi-line Insurance","COUNTRY":"FR","RANK_WITHIN_COUNTRY":10},
+{"Company":"HSBC Holdings PLC","% OF FUNDS*":"0.29%","Industry":"Diversified Banks","COUNTRY":"GB","RANK_WITHIN_COUNTRY":1},
+{"Company":"AstraZeneca PLC","% OF FUNDS*":"0.29%","Industry":"Pharmaceuticals","COUNTRY":"GB","RANK_WITHIN_COUNTRY":2},
+{"Company":"Shell PLC","% OF FUNDS*":"0.22%","Industry":"Integrated Oil & Gas","COUNTRY":"GB","RANK_WITHIN_COUNTRY":3},
+{"Company":"Unilever PLC","% OF FUNDS*":"0.14%","Industry":"Personal Care Products","COUNTRY":"GB","RANK_WITHIN_COUNTRY":4},
+{"Company":"Rolls-Royce Holdings PLC","% OF FUNDS*":"0.14%","Industry":"Aerospace & Defense","COUNTRY":"GB","RANK_WITHIN_COUNTRY":5},
+{"Company":"British American Tobacco PLC","% OF FUNDS*":"0.12%","Industry":"Tobacco","COUNTRY":"GB","RANK_WITHIN_COUNTRY":6},
+{"Company":"GSK PLC","% OF FUNDS*":"0.11%","Industry":"Pharmaceuticals","COUNTRY":"GB","RANK_WITHIN_COUNTRY":7},
+{"Company":"BP PLC","% OF FUNDS*":"0.09%","Industry":"Integrated Oil & Gas","COUNTRY":"GB","RANK_WITHIN_COUNTRY":8},
+{"Company":"Rio Tinto PLC","% OF FUNDS*":"0.09%","Industry":"Diversified Metals & Mining","COUNTRY":"GB","RANK_WITHIN_COUNTRY":9},
+{"Company":"National Grid PLC","% OF FUNDS*":"0.08%","Industry":"Multi-Utilities","COUNTRY":"GB","RANK_WITHIN_COUNTRY":10},
+{"Company":"National Bank of Greece SA","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"GR","RANK_WITHIN_COUNTRY":1},
+{"Company":"Eurobank SA","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"GR","RANK_WITHIN_COUNTRY":2},
+{"Company":"Piraeus Bank SA","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"GR","RANK_WITHIN_COUNTRY":3},
+{"Company":"Alpha Bank SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"GR","RANK_WITHIN_COUNTRY":4},
+{"Company":"Public Power Corp SA","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"GR","RANK_WITHIN_COUNTRY":5},
+{"Company":"Bank of Cyprus Holdings PLC","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"GR","RANK_WITHIN_COUNTRY":6},
+{"Company":"JUMBO SA","% OF FUNDS*":"<0.01%","Industry":"Other Specialty Retail","COUNTRY":"GR","RANK_WITHIN_COUNTRY":7},
+{"Company":"OPAP Holding SA","% OF FUNDS*":"<0.01%","Industry":"Casinos & Gaming","COUNTRY":"GR","RANK_WITHIN_COUNTRY":8},
+{"Company":"GEK TERNA SA","% OF FUNDS*":"<0.01%","Industry":"Construction & Engineering","COUNTRY":"GR","RANK_WITHIN_COUNTRY":9},
+{"Company":"Motor Oil Hellas Corinth Refineries SA","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Refining & Marketing","COUNTRY":"GR","RANK_WITHIN_COUNTRY":10},
+{"Company":"Tencent Holdings Ltd","% OF FUNDS*":"0.37%","Industry":"Interactive Media & Services","COUNTRY":"HK","RANK_WITHIN_COUNTRY":1},
+{"Company":"Alibaba Group Holding Ltd","% OF FUNDS*":"0.29%","Industry":"Broadline Retail","COUNTRY":"HK","RANK_WITHIN_COUNTRY":2},
+{"Company":"AIA Group Ltd","% OF FUNDS*":"0.10%","Industry":"Life & Health Insurance","COUNTRY":"HK","RANK_WITHIN_COUNTRY":3},
+{"Company":"China Construction Bank Corp","% OF FUNDS*":"0.08%","Industry":"Diversified Banks","COUNTRY":"HK","RANK_WITHIN_COUNTRY":4},
+{"Company":"Xiaomi Corp","% OF FUNDS*":"0.07%","Industry":"Technology Hardware, Storage & Peripherals","COUNTRY":"HK","RANK_WITHIN_COUNTRY":5},
+{"Company":"Industrial & Commercial Bank of China Ltd","% OF FUNDS*":"0.06%","Industry":"Diversified Banks","COUNTRY":"HK","RANK_WITHIN_COUNTRY":6},
+{"Company":"Hong Kong Exchanges & Clearing Ltd","% OF FUNDS*":"0.06%","Industry":"Financial Exchanges & Data","COUNTRY":"HK","RANK_WITHIN_COUNTRY":7},
+{"Company":"Ping An Insurance Group Co of China Ltd","% OF FUNDS*":"0.05%","Industry":"Life & Health Insurance","COUNTRY":"HK","RANK_WITHIN_COUNTRY":8},
+{"Company":"Meituan","% OF FUNDS*":"0.05%","Industry":"Restaurants","COUNTRY":"HK","RANK_WITHIN_COUNTRY":9},
+{"Company":"BYD Co Ltd","% OF FUNDS*":"0.04%","Industry":"Automobile Manufacturers","COUNTRY":"HK","RANK_WITHIN_COUNTRY":10},
+{"Company":"OTP Bank Nyrt","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"HU","RANK_WITHIN_COUNTRY":1},
+{"Company":"Richter Gedeon Nyrt","% OF FUNDS*":"<0.01%","Industry":"Pharmaceuticals","COUNTRY":"HU","RANK_WITHIN_COUNTRY":2},
+{"Company":"MOL Hungarian Oil & Gas PLC","% OF FUNDS*":"<0.01%","Industry":"Integrated Oil & Gas","COUNTRY":"HU","RANK_WITHIN_COUNTRY":3},
+{"Company":"Magyar Telekom Telecommunications PLC","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"HU","RANK_WITHIN_COUNTRY":4},
+{"Company":"Opus Global Nyrt","% OF FUNDS*":"<0.01%","Industry":"Industrial Conglomerates","COUNTRY":"HU","RANK_WITHIN_COUNTRY":5},
+{"Company":"4iG Nyrt","% OF FUNDS*":"<0.01%","Industry":"IT Consulting & Other Services","COUNTRY":"HU","RANK_WITHIN_COUNTRY":6},
+{"Company":"Bank Central Asia Tbk PT","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"ID","RANK_WITHIN_COUNTRY":1},
+{"Company":"Bank Rakyat Indonesia Persero Tbk PT","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"ID","RANK_WITHIN_COUNTRY":2},
+{"Company":"Bank Mandiri Persero Tbk PT","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"ID","RANK_WITHIN_COUNTRY":3},
+{"Company":"Telkom Indonesia Persero Tbk PT","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"ID","RANK_WITHIN_COUNTRY":4},
+{"Company":"Astra International Tbk PT","% OF FUNDS*":"<0.01%","Industry":"Industrial Conglomerates","COUNTRY":"ID","RANK_WITHIN_COUNTRY":5},
+{"Company":"Dian Swastatika Sentosa Tbk PT","% OF FUNDS*":"<0.01%","Industry":"Coal & Consumable Fuels","COUNTRY":"ID","RANK_WITHIN_COUNTRY":6},
+{"Company":"Amman Mineral Internasional PT","% OF FUNDS*":"<0.01%","Industry":"Copper","COUNTRY":"ID","RANK_WITHIN_COUNTRY":7},
+{"Company":"Bumi Resources Minerals Tbk PT","% OF FUNDS*":"<0.01%","Industry":"Diversified Metals & Mining","COUNTRY":"ID","RANK_WITHIN_COUNTRY":8},
+{"Company":"Bank Negara Indonesia Persero Tbk PT","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"ID","RANK_WITHIN_COUNTRY":9},
+{"Company":"GoTo Gojek Tokopedia Tbk PT","% OF FUNDS*":"<0.01%","Industry":"Broadline Retail","COUNTRY":"ID","RANK_WITHIN_COUNTRY":10},
+{"Company":"AIB Group PLC","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"IE","RANK_WITHIN_COUNTRY":1},
+{"Company":"Bank of Ireland Group PLC","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"IE","RANK_WITHIN_COUNTRY":2},
+{"Company":"Kerry Group PLC","% OF FUNDS*":"0.01%","Industry":"Packaged Foods & Meats","COUNTRY":"IE","RANK_WITHIN_COUNTRY":3},
+{"Company":"Kingspan Group PLC","% OF FUNDS*":"0.01%","Industry":"Building Products","COUNTRY":"IE","RANK_WITHIN_COUNTRY":4},
+{"Company":"Ryanair Holdings PLC","% OF FUNDS*":"<0.01%","Industry":"Passenger Airlines","COUNTRY":"IE","RANK_WITHIN_COUNTRY":5},
+{"Company":"Glanbia PLC","% OF FUNDS*":"<0.01%","Industry":"Packaged Foods & Meats","COUNTRY":"IE","RANK_WITHIN_COUNTRY":6},
+{"Company":"Cairn Homes PLC","% OF FUNDS*":"<0.01%","Industry":"Homebuilding","COUNTRY":"IE","RANK_WITHIN_COUNTRY":7},
+{"Company":"Irish Bank Resolution Corp Ltd/Old","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"IE","RANK_WITHIN_COUNTRY":8},
+{"Company":"Teva Pharmaceutical Industries Ltd","% OF FUNDS*":"0.04%","Industry":"Pharmaceuticals","COUNTRY":"IL","RANK_WITHIN_COUNTRY":1},
+{"Company":"Bank Leumi Le-Israel BM","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"IL","RANK_WITHIN_COUNTRY":2},
+{"Company":"Bank Hapoalim BM","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"IL","RANK_WITHIN_COUNTRY":3},
+{"Company":"Elbit Systems Ltd","% OF FUNDS*":"0.02%","Industry":"Aerospace & Defense","COUNTRY":"IL","RANK_WITHIN_COUNTRY":4},
+{"Company":"Israel Discount Bank Ltd","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"IL","RANK_WITHIN_COUNTRY":5},
+{"Company":"Tower Semiconductor Ltd","% OF FUNDS*":"0.01%","Industry":"Semiconductors","COUNTRY":"IL","RANK_WITHIN_COUNTRY":6},
+{"Company":"Nova Ltd","% OF FUNDS*":"0.01%","Industry":"Semiconductor Materials & Equipment","COUNTRY":"IL","RANK_WITHIN_COUNTRY":7},
+{"Company":"Phoenix Financial Ltd","% OF FUNDS*":"0.01%","Industry":"Multi-line Insurance","COUNTRY":"IL","RANK_WITHIN_COUNTRY":8},
+{"Company":"Mizrahi Tefahot Bank Ltd","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"IL","RANK_WITHIN_COUNTRY":9},
+{"Company":"Enlight Renewable Energy Ltd","% OF FUNDS*":"<0.01%","Industry":"Renewable Electricity","COUNTRY":"IL","RANK_WITHIN_COUNTRY":10},
+{"Company":"HDFC Bank Ltd","% OF FUNDS*":"0.10%","Industry":"Diversified Banks","COUNTRY":"IN","RANK_WITHIN_COUNTRY":1},
+{"Company":"Reliance Industries Ltd","% OF FUNDS*":"0.08%","Industry":"Oil & Gas Refining & Marketing","COUNTRY":"IN","RANK_WITHIN_COUNTRY":2},
+{"Company":"ICICI Bank Ltd","% OF FUNDS*":"0.07%","Industry":"Diversified Banks","COUNTRY":"IN","RANK_WITHIN_COUNTRY":3},
+{"Company":"Bharti Airtel Ltd","% OF FUNDS*":"0.05%","Industry":"Wireless Telecommunication Services","COUNTRY":"IN","RANK_WITHIN_COUNTRY":4},
+{"Company":"Infosys Ltd","% OF FUNDS*":"0.04%","Industry":"IT Consulting & Other Services","COUNTRY":"IN","RANK_WITHIN_COUNTRY":5},
+{"Company":"Axis Bank Ltd","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"IN","RANK_WITHIN_COUNTRY":6},
+{"Company":"Mahindra & Mahindra Ltd","% OF FUNDS*":"0.03%","Industry":"Automobile Manufacturers","COUNTRY":"IN","RANK_WITHIN_COUNTRY":7},
+{"Company":"Larsen & Toubro Ltd","% OF FUNDS*":"0.03%","Industry":"Construction & Engineering","COUNTRY":"IN","RANK_WITHIN_COUNTRY":8},
+{"Company":"Bajaj Finance Ltd","% OF FUNDS*":"0.03%","Industry":"Consumer Finance","COUNTRY":"IN","RANK_WITHIN_COUNTRY":9},
+{"Company":"Tata Consultancy Services Ltd","% OF FUNDS*":"0.03%","Industry":"IT Consulting & Other Services","COUNTRY":"IN","RANK_WITHIN_COUNTRY":10},
+{"Company":"Islandsbanki HF","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"IS","RANK_WITHIN_COUNTRY":1},
+{"Company":"Arion Banki HF","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"IS","RANK_WITHIN_COUNTRY":2},
+{"Company":"Hagar hf","% OF FUNDS*":"<0.01%","Industry":"Consumer Staples Merchandise Retail","COUNTRY":"IS","RANK_WITHIN_COUNTRY":3},
+{"Company":"Festi hf","% OF FUNDS*":"<0.01%","Industry":"Automotive Retail","COUNTRY":"IS","RANK_WITHIN_COUNTRY":4},
+{"Company":"Reitir fasteignafelag hf","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"IS","RANK_WITHIN_COUNTRY":5},
+{"Company":"Kvika banki hf","% OF FUNDS*":"<0.01%","Industry":"Diversified Capital Markets","COUNTRY":"IS","RANK_WITHIN_COUNTRY":6},
+{"Company":"Alvotech SA","% OF FUNDS*":"<0.01%","Industry":"Biotechnology","COUNTRY":"IS","RANK_WITHIN_COUNTRY":7},
+{"Company":"Heimar HF","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"IS","RANK_WITHIN_COUNTRY":8},
+{"Company":"Skagi Hf","% OF FUNDS*":"<0.01%","Industry":"Property & Casualty Insurance","COUNTRY":"IS","RANK_WITHIN_COUNTRY":9},
+{"Company":"Sjova-Almennar Tryggingar hf","% OF FUNDS*":"<0.01%","Industry":"Multi-line Insurance","COUNTRY":"IS","RANK_WITHIN_COUNTRY":10},
+{"Company":"UniCredit SpA","% OF FUNDS*":"0.12%","Industry":"Diversified Banks","COUNTRY":"IT","RANK_WITHIN_COUNTRY":1},
+{"Company":"Intesa Sanpaolo SpA","% OF FUNDS*":"0.10%","Industry":"Diversified Banks","COUNTRY":"IT","RANK_WITHIN_COUNTRY":2},
+{"Company":"Enel SpA","% OF FUNDS*":"0.08%","Industry":"Electric Utilities","COUNTRY":"IT","RANK_WITHIN_COUNTRY":3},
+{"Company":"Eni SpA","% OF FUNDS*":"0.04%","Industry":"Integrated Oil & Gas","COUNTRY":"IT","RANK_WITHIN_COUNTRY":4},
+{"Company":"Ferrari NV","% OF FUNDS*":"0.04%","Industry":"Automobile Manufacturers","COUNTRY":"IT","RANK_WITHIN_COUNTRY":5},
+{"Company":"Generali","% OF FUNDS*":"0.04%","Industry":"Multi-line Insurance","COUNTRY":"IT","RANK_WITHIN_COUNTRY":6},
+{"Company":"Prysmian SpA","% OF FUNDS*":"0.03%","Industry":"Electrical Components & Equipment","COUNTRY":"IT","RANK_WITHIN_COUNTRY":7},
+{"Company":"Leonardo SpA","% OF FUNDS*":"0.03%","Industry":"Aerospace & Defense","COUNTRY":"IT","RANK_WITHIN_COUNTRY":8},
+{"Company":"Banco BPM SpA","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"IT","RANK_WITHIN_COUNTRY":9},
+{"Company":"Banca Monte dei Paschi di Siena SpA","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"IT","RANK_WITHIN_COUNTRY":10},
+{"Company":"Toyota Motor Corp","% OF FUNDS*":"0.23%","Industry":"Automobile Manufacturers","COUNTRY":"JP","RANK_WITHIN_COUNTRY":1},
+{"Company":"Mitsubishi UFJ Financial Group Inc","% OF FUNDS*":"0.18%","Industry":"Diversified Banks","COUNTRY":"JP","RANK_WITHIN_COUNTRY":2},
+{"Company":"Hitachi Ltd","% OF FUNDS*":"0.13%","Industry":"Industrial Conglomerates","COUNTRY":"JP","RANK_WITHIN_COUNTRY":3},
+{"Company":"Sumitomo Mitsui Financial Group Inc","% OF FUNDS*":"0.13%","Industry":"Diversified Banks","COUNTRY":"JP","RANK_WITHIN_COUNTRY":4},
+{"Company":"Sony Group Corp","% OF FUNDS*":"0.12%","Industry":"Consumer Electronics","COUNTRY":"JP","RANK_WITHIN_COUNTRY":5},
+{"Company":"Advantest Corp","% OF FUNDS*":"0.11%","Industry":"Semiconductor Materials & Equipment","COUNTRY":"JP","RANK_WITHIN_COUNTRY":6},
+{"Company":"Tokyo Electron Ltd","% OF FUNDS*":"0.11%","Industry":"Semiconductor Materials & Equipment","COUNTRY":"JP","RANK_WITHIN_COUNTRY":7},
+{"Company":"Mitsubishi Corp","% OF FUNDS*":"0.10%","Industry":"Trading Companies & Distributors","COUNTRY":"JP","RANK_WITHIN_COUNTRY":8},
+{"Company":"Mizuho Financial Group Inc","% OF FUNDS*":"0.10%","Industry":"Diversified Banks","COUNTRY":"JP","RANK_WITHIN_COUNTRY":9},
+{"Company":"Mitsubishi Heavy Industries Ltd","% OF FUNDS*":"0.09%","Industry":"Industrial Machinery & Supplies & Components","COUNTRY":"JP","RANK_WITHIN_COUNTRY":10},
+{"Company":"Samsung Electronics Co Ltd","% OF FUNDS*":"0.64%","Industry":"Technology Hardware, Storage & Peripherals","COUNTRY":"KR","RANK_WITHIN_COUNTRY":1},
+{"Company":"SK hynix Inc","% OF FUNDS*":"0.36%","Industry":"Semiconductors","COUNTRY":"KR","RANK_WITHIN_COUNTRY":2},
+{"Company":"SAMSUNG ELECTRONICS-PREF","% OF FUNDS*":"0.07%","Industry":"Technology Hardware, Storage & Peripherals","COUNTRY":"KR","RANK_WITHIN_COUNTRY":3},
+{"Company":"Hyundai Motor Co","% OF FUNDS*":"0.06%","Industry":"Automobile Manufacturers","COUNTRY":"KR","RANK_WITHIN_COUNTRY":4},
+{"Company":"SK Square Co Ltd","% OF FUNDS*":"0.04%","Industry":"Industrial Conglomerates","COUNTRY":"KR","RANK_WITHIN_COUNTRY":5},
+{"Company":"KB Financial Group Inc","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"KR","RANK_WITHIN_COUNTRY":6},
+{"Company":"Kia Corp","% OF FUNDS*":"0.03%","Industry":"Automobile Manufacturers","COUNTRY":"KR","RANK_WITHIN_COUNTRY":7},
+{"Company":"Doosan Enerbility Co Ltd","% OF FUNDS*":"0.03%","Industry":"Heavy Electrical Equipment","COUNTRY":"KR","RANK_WITHIN_COUNTRY":8},
+{"Company":"Shinhan Financial Group Co Ltd","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"KR","RANK_WITHIN_COUNTRY":9},
+{"Company":"Hanwha Aerospace Co Ltd","% OF FUNDS*":"0.03%","Industry":"Aerospace & Defense","COUNTRY":"KR","RANK_WITHIN_COUNTRY":10},
+{"Company":"Kuwait Finance House KSCP","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":1},
+{"Company":"National Bank of Kuwait SAKP","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":2},
+{"Company":"Boubyan Bank KSCP","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":3},
+{"Company":"Mobile Telecommunications Co KSCP","% OF FUNDS*":"<0.01%","Industry":"Wireless Telecommunication Services","COUNTRY":"KW","RANK_WITHIN_COUNTRY":4},
+{"Company":"Gulf Bank KSCP","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":5},
+{"Company":"Mabanee Co KPSC","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"KW","RANK_WITHIN_COUNTRY":6},
+{"Company":"Warba Bank KSCP","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":7},
+{"Company":"National Industries Group Holding SAK","% OF FUNDS*":"<0.01%","Industry":"Industrial Conglomerates","COUNTRY":"KW","RANK_WITHIN_COUNTRY":8},
+{"Company":"Al Ahli Bank of Kuwait KSCP","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":9},
+{"Company":"Kuwait International Bank KSCP","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"KW","RANK_WITHIN_COUNTRY":10},
+{"Company":"Grupo Mexico SAB de CV","% OF FUNDS*":"0.03%","Industry":"Diversified Metals & Mining","COUNTRY":"MX","RANK_WITHIN_COUNTRY":1},
+{"Company":"Grupo Financiero Banorte SAB de CV","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"MX","RANK_WITHIN_COUNTRY":2},
+{"Company":"America Movil SAB de CV","% OF FUNDS*":"0.02%","Industry":"Wireless Telecommunication Services","COUNTRY":"MX","RANK_WITHIN_COUNTRY":3},
+{"Company":"Fomento Economico Mexicano SAB de CV","% OF FUNDS*":"0.02%","Industry":"Soft Drinks & Non-alcoholic Beverages","COUNTRY":"MX","RANK_WITHIN_COUNTRY":4},
+{"Company":"Cemex SAB de CV","% OF FUNDS*":"0.02%","Industry":"Construction Materials","COUNTRY":"MX","RANK_WITHIN_COUNTRY":5},
+{"Company":"Wal-Mart de Mexico SAB de CV","% OF FUNDS*":"0.01%","Industry":"Consumer Staples Merchandise Retail","COUNTRY":"MX","RANK_WITHIN_COUNTRY":6},
+{"Company":"Grupo Aeroportuario del Pacifico SAB de CV","% OF FUNDS*":"0.01%","Industry":"Airport Services","COUNTRY":"MX","RANK_WITHIN_COUNTRY":7},
+{"Company":"Industrias Penoles SAB de CV","% OF FUNDS*":"0.01%","Industry":"Precious Metals & Minerals","COUNTRY":"MX","RANK_WITHIN_COUNTRY":8},
+{"Company":"Arca Continental SAB de CV","% OF FUNDS*":"<0.01%","Industry":"Soft Drinks & Non-alcoholic Beverages","COUNTRY":"MX","RANK_WITHIN_COUNTRY":9},
+{"Company":"Coca-Cola Femsa SAB de CV","% OF FUNDS*":"<0.01%","Industry":"Soft Drinks & Non-alcoholic Beverages","COUNTRY":"MX","RANK_WITHIN_COUNTRY":10},
+{"Company":"Malayan Banking Bhd","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"MY","RANK_WITHIN_COUNTRY":1},
+{"Company":"Public Bank Bhd","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"MY","RANK_WITHIN_COUNTRY":2},
+{"Company":"CIMB Group Holdings Bhd","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"MY","RANK_WITHIN_COUNTRY":3},
+{"Company":"Tenaga Nasional Bhd","% OF FUNDS*":"0.01%","Industry":"Electric Utilities","COUNTRY":"MY","RANK_WITHIN_COUNTRY":4},
+{"Company":"IHH Healthcare Bhd","% OF FUNDS*":"<0.01%","Industry":"Health Care Facilities","COUNTRY":"MY","RANK_WITHIN_COUNTRY":5},
+{"Company":"Press Metal Aluminium Holdings Bhd","% OF FUNDS*":"<0.01%","Industry":"Aluminum","COUNTRY":"MY","RANK_WITHIN_COUNTRY":6},
+{"Company":"Gamuda Bhd","% OF FUNDS*":"<0.01%","Industry":"Construction & Engineering","COUNTRY":"MY","RANK_WITHIN_COUNTRY":7},
+{"Company":"SD Guthrie Bhd","% OF FUNDS*":"<0.01%","Industry":"Agricultural Products & Services","COUNTRY":"MY","RANK_WITHIN_COUNTRY":8},
+{"Company":"AMMB Holdings Bhd","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"MY","RANK_WITHIN_COUNTRY":9},
+{"Company":"RHB Bank Bhd","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"MY","RANK_WITHIN_COUNTRY":10},
+{"Company":"ASML Holding NV","% OF FUNDS*":"0.52%","Industry":"Semiconductor Materials & Equipment","COUNTRY":"NL","RANK_WITHIN_COUNTRY":1},
+{"Company":"ING Groep NV","% OF FUNDS*":"0.08%","Industry":"Diversified Banks","COUNTRY":"NL","RANK_WITHIN_COUNTRY":2},
+{"Company":"Prosus NV","% OF FUNDS*":"0.06%","Industry":"Broadline Retail","COUNTRY":"NL","RANK_WITHIN_COUNTRY":3},
+{"Company":"Koninklijke Ahold Delhaize NV","% OF FUNDS*":"0.04%","Industry":"Food Retail","COUNTRY":"NL","RANK_WITHIN_COUNTRY":4},
+{"Company":"ASM International NV","% OF FUNDS*":"0.04%","Industry":"Semiconductor Materials & Equipment","COUNTRY":"NL","RANK_WITHIN_COUNTRY":5},
+{"Company":"Adyen NV","% OF FUNDS*":"0.03%","Industry":"Transaction & Payment Processing Services","COUNTRY":"NL","RANK_WITHIN_COUNTRY":6},
+{"Company":"ArcelorMittal SA","% OF FUNDS*":"0.03%","Industry":"Steel","COUNTRY":"NL","RANK_WITHIN_COUNTRY":7},
+{"Company":"Heineken NV","% OF FUNDS*":"0.02%","Industry":"Brewers","COUNTRY":"NL","RANK_WITHIN_COUNTRY":8},
+{"Company":"Koninklijke Philips NV","% OF FUNDS*":"0.02%","Industry":"Health Care Equipment","COUNTRY":"NL","RANK_WITHIN_COUNTRY":9},
+{"Company":"Koninklijke KPN NV","% OF FUNDS*":"0.02%","Industry":"Integrated Telecommunication Services","COUNTRY":"NL","RANK_WITHIN_COUNTRY":10},
+{"Company":"DNB Bank ASA","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"NO","RANK_WITHIN_COUNTRY":1},
+{"Company":"Equinor ASA","% OF FUNDS*":"0.02%","Industry":"Integrated Oil & Gas","COUNTRY":"NO","RANK_WITHIN_COUNTRY":2},
+{"Company":"Kongsberg Gruppen ASA","% OF FUNDS*":"0.01%","Industry":"Aerospace & Defense","COUNTRY":"NO","RANK_WITHIN_COUNTRY":3},
+{"Company":"Mowi ASA","% OF FUNDS*":"0.01%","Industry":"Packaged Foods & Meats","COUNTRY":"NO","RANK_WITHIN_COUNTRY":4},
+{"Company":"Norsk Hydro ASA","% OF FUNDS*":"0.01%","Industry":"Aluminum","COUNTRY":"NO","RANK_WITHIN_COUNTRY":5},
+{"Company":"Telenor ASA","% OF FUNDS*":"0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"NO","RANK_WITHIN_COUNTRY":6},
+{"Company":"Aker BP ASA","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Exploration & Production","COUNTRY":"NO","RANK_WITHIN_COUNTRY":7},
+{"Company":"Orkla ASA","% OF FUNDS*":"<0.01%","Industry":"Packaged Foods & Meats","COUNTRY":"NO","RANK_WITHIN_COUNTRY":8},
+{"Company":"Subsea 7 SA","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Equipment & Services","COUNTRY":"NO","RANK_WITHIN_COUNTRY":9},
+{"Company":"Yara International ASA","% OF FUNDS*":"<0.01%","Industry":"Fertilizers & Agricultural Chemicals","COUNTRY":"NO","RANK_WITHIN_COUNTRY":10},
+{"Company":"Fisher & Paykel Healthcare Corp Ltd","% OF FUNDS*":"0.01%","Industry":"Health Care Equipment","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":1},
+{"Company":"Auckland International Airport Ltd","% OF FUNDS*":"0.01%","Industry":"Airport Services","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":2},
+{"Company":"Infratil Ltd","% OF FUNDS*":"<0.01%","Industry":"Multi-Sector Holdings","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":3},
+{"Company":"Contact Energy Ltd","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":4},
+{"Company":"Meridian Energy Ltd","% OF FUNDS*":"<0.01%","Industry":"Renewable Electricity","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":5},
+{"Company":"Mainfreight Ltd","% OF FUNDS*":"<0.01%","Industry":"Air Freight & Logistics","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":6},
+{"Company":"EBOS Group Ltd","% OF FUNDS*":"<0.01%","Industry":"Health Care Distributors","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":7},
+{"Company":"Mercury NZ Ltd","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":8},
+{"Company":"Spark New Zealand Ltd","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":9},
+{"Company":"Fletcher Building Ltd","% OF FUNDS*":"<0.01%","Industry":"Building Products","COUNTRY":"NZ","RANK_WITHIN_COUNTRY":10},
+{"Company":"International Container Terminal Services Inc","% OF FUNDS*":"0.01%","Industry":"Marine Ports & Services","COUNTRY":"PH","RANK_WITHIN_COUNTRY":1},
+{"Company":"BDO Unibank Inc","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"PH","RANK_WITHIN_COUNTRY":2},
+{"Company":"Bank of the Philippine Islands","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"PH","RANK_WITHIN_COUNTRY":3},
+{"Company":"SM Prime Holdings Inc","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"PH","RANK_WITHIN_COUNTRY":4},
+{"Company":"Ayala Corp","% OF FUNDS*":"<0.01%","Industry":"Industrial Conglomerates","COUNTRY":"PH","RANK_WITHIN_COUNTRY":5},
+{"Company":"Manila Electric Co","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"PH","RANK_WITHIN_COUNTRY":6},
+{"Company":"Metropolitan Bank & Trust Co","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"PH","RANK_WITHIN_COUNTRY":7},
+{"Company":"Ayala Land Inc","% OF FUNDS*":"<0.01%","Industry":"Diversified Real Estate Activities","COUNTRY":"PH","RANK_WITHIN_COUNTRY":8},
+{"Company":"PLDT Inc","% OF FUNDS*":"<0.01%","Industry":"Wireless Telecommunication Services","COUNTRY":"PH","RANK_WITHIN_COUNTRY":9},
+{"Company":"Cebu Air Inc","% OF FUNDS*":"<0.01%","Industry":"Passenger Airlines","COUNTRY":"PH","RANK_WITHIN_COUNTRY":10},
+{"Company":"Powszechna Kasa Oszczednosci Bank Polski SA","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"PL","RANK_WITHIN_COUNTRY":1},
+{"Company":"ORLEN SA","% OF FUNDS*":"0.02%","Industry":"Oil & Gas Refining & Marketing","COUNTRY":"PL","RANK_WITHIN_COUNTRY":2},
+{"Company":"KGHM Polska Miedz SA","% OF FUNDS*":"0.01%","Industry":"Copper","COUNTRY":"PL","RANK_WITHIN_COUNTRY":3},
+{"Company":"Bank Polska Kasa Opieki SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"PL","RANK_WITHIN_COUNTRY":4},
+{"Company":"Powszechny Zaklad Ubezpieczen SA","% OF FUNDS*":"<0.01%","Industry":"Multi-line Insurance","COUNTRY":"PL","RANK_WITHIN_COUNTRY":5},
+{"Company":"LPP SA","% OF FUNDS*":"<0.01%","Industry":"Apparel, Accessories & Luxury Goods","COUNTRY":"PL","RANK_WITHIN_COUNTRY":6},
+{"Company":"Santander Bank Polska SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"PL","RANK_WITHIN_COUNTRY":7},
+{"Company":"Allegro.eu SA","% OF FUNDS*":"<0.01%","Industry":"Broadline Retail","COUNTRY":"PL","RANK_WITHIN_COUNTRY":8},
+{"Company":"Dino Polska SA","% OF FUNDS*":"<0.01%","Industry":"Food Retail","COUNTRY":"PL","RANK_WITHIN_COUNTRY":9},
+{"Company":"CD Projekt SA","% OF FUNDS*":"<0.01%","Industry":"Interactive Home Entertainment","COUNTRY":"PL","RANK_WITHIN_COUNTRY":10},
+{"Company":"EDP SA","% OF FUNDS*":"0.02%","Industry":"Electric Utilities","COUNTRY":"PT","RANK_WITHIN_COUNTRY":1},
+{"Company":"Banco Comercial Portugues SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"PT","RANK_WITHIN_COUNTRY":2},
+{"Company":"Galp Energia SGPS SA","% OF FUNDS*":"<0.01%","Industry":"Integrated Oil & Gas","COUNTRY":"PT","RANK_WITHIN_COUNTRY":3},
+{"Company":"Jeronimo Martins SGPS SA","% OF FUNDS*":"<0.01%","Industry":"Food Retail","COUNTRY":"PT","RANK_WITHIN_COUNTRY":4},
+{"Company":"EDP Renovaveis SA","% OF FUNDS*":"<0.01%","Industry":"Renewable Electricity","COUNTRY":"PT","RANK_WITHIN_COUNTRY":5},
+{"Company":"REN - Redes Energeticas Nacionais SGPS SA","% OF FUNDS*":"<0.01%","Industry":"Multi-Utilities","COUNTRY":"PT","RANK_WITHIN_COUNTRY":6},
+{"Company":"Sonae SGPS SA","% OF FUNDS*":"<0.01%","Industry":"Food Retail","COUNTRY":"PT","RANK_WITHIN_COUNTRY":7},
+{"Company":"NOS SGPS SA","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"PT","RANK_WITHIN_COUNTRY":8},
+{"Company":"CTT-Correios de Portugal SA","% OF FUNDS*":"<0.01%","Industry":"Air Freight & Logistics","COUNTRY":"PT","RANK_WITHIN_COUNTRY":9},
+{"Company":"Navigator Co SA/The","% OF FUNDS*":"<0.01%","Industry":"Paper Products","COUNTRY":"PT","RANK_WITHIN_COUNTRY":10},
+{"Company":"Qatar National Bank QPSC","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"QA","RANK_WITHIN_COUNTRY":1},
+{"Company":"Qatar Islamic Bank QPSC","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"QA","RANK_WITHIN_COUNTRY":2},
+{"Company":"Industries Qatar QSC","% OF FUNDS*":"<0.01%","Industry":"Industrial Conglomerates","COUNTRY":"QA","RANK_WITHIN_COUNTRY":3},
+{"Company":"Commercial Bank PSQC/The","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"QA","RANK_WITHIN_COUNTRY":4},
+{"Company":"Al Rayan Bank","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"QA","RANK_WITHIN_COUNTRY":5},
+{"Company":"Qatar Gas Transport Co Ltd","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Storage & Transportation","COUNTRY":"QA","RANK_WITHIN_COUNTRY":6},
+{"Company":"Qatar Navigation QSC","% OF FUNDS*":"<0.01%","Industry":"Marine Transportation","COUNTRY":"QA","RANK_WITHIN_COUNTRY":7},
+{"Company":"Qatar International Islamic Bank QSC","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"QA","RANK_WITHIN_COUNTRY":8},
+{"Company":"Ooredoo QPSC","% OF FUNDS*":"<0.01%","Industry":"Integrated Telecommunication Services","COUNTRY":"QA","RANK_WITHIN_COUNTRY":9},
+{"Company":"Doha Bank QPSC","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"QA","RANK_WITHIN_COUNTRY":10},
+{"Company":"Banca Transilvania SA","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"RO","RANK_WITHIN_COUNTRY":1},
+{"Company":"OMV Petrom SA","% OF FUNDS*":"<0.01%","Industry":"Integrated Oil & Gas","COUNTRY":"RO","RANK_WITHIN_COUNTRY":2},
+{"Company":"Societatea De Producere A Energiei Electrice in Hidrocentrale Hidroelectrica SA","% OF FUNDS*":"<0.01%","Industry":"Renewable Electricity","COUNTRY":"RO","RANK_WITHIN_COUNTRY":3},
+{"Company":"Societatea Energetica Electrica SA","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"RO","RANK_WITHIN_COUNTRY":4},
+{"Company":"Societatea Nationala Nuclearelectrica SA","% OF FUNDS*":"<0.01%","Industry":"Electric Utilities","COUNTRY":"RO","RANK_WITHIN_COUNTRY":5},
+{"Company":"MED Life SA","% OF FUNDS*":"<0.01%","Industry":"Health Care Services","COUNTRY":"RO","RANK_WITHIN_COUNTRY":6},
+{"Company":"One United Properties SA","% OF FUNDS*":"<0.01%","Industry":"Real Estate Development","COUNTRY":"RO","RANK_WITHIN_COUNTRY":7},
+{"Company":"TTS Transport Trade Services SA","% OF FUNDS*":"<0.01%","Industry":"Marine Transportation","COUNTRY":"RO","RANK_WITHIN_COUNTRY":8},
+{"Company":"Teraplast SA","% OF FUNDS*":"<0.01%","Industry":"Commodity Chemicals","COUNTRY":"RO","RANK_WITHIN_COUNTRY":9},
+{"Company":"Segezha Group PJSC","% OF FUNDS*":"<0.01%","Industry":"Paper Products","COUNTRY":"RU","RANK_WITHIN_COUNTRY":1},
+{"Company":"Raspadskaya PAO","% OF FUNDS*":"<0.01%","Industry":"Steel","COUNTRY":"RU","RANK_WITHIN_COUNTRY":2},
+{"Company":"Al Rajhi Bank","% OF FUNDS*":"0.05%","Industry":"Diversified Banks","COUNTRY":"SA","RANK_WITHIN_COUNTRY":1},
+{"Company":"Saudi Arabian Oil Co","% OF FUNDS*":"0.04%","Industry":"Integrated Oil & Gas","COUNTRY":"SA","RANK_WITHIN_COUNTRY":2},
+{"Company":"Saudi National Bank/The","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"SA","RANK_WITHIN_COUNTRY":3},
+{"Company":"Saudi Arabian Mining Co","% OF FUNDS*":"0.02%","Industry":"Diversified Metals & Mining","COUNTRY":"SA","RANK_WITHIN_COUNTRY":4},
+{"Company":"Saudi Telecom Co","% OF FUNDS*":"0.02%","Industry":"Integrated Telecommunication Services","COUNTRY":"SA","RANK_WITHIN_COUNTRY":5},
+{"Company":"Saudi Basic Industries Corp","% OF FUNDS*":"0.01%","Industry":"Commodity Chemicals","COUNTRY":"SA","RANK_WITHIN_COUNTRY":6},
+{"Company":"Riyad Bank","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"SA","RANK_WITHIN_COUNTRY":7},
+{"Company":"ACWA Power Co","% OF FUNDS*":"<0.01%","Industry":"Independent Power Producers & Energy Traders","COUNTRY":"SA","RANK_WITHIN_COUNTRY":8},
+{"Company":"Alinma Bank","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"SA","RANK_WITHIN_COUNTRY":9},
+{"Company":"Saudi Awwal Bank","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"SA","RANK_WITHIN_COUNTRY":10},
+{"Company":"Investor AB","% OF FUNDS*":"0.06%","Industry":"Multi-Sector Holdings","COUNTRY":"SE","RANK_WITHIN_COUNTRY":1},
+{"Company":"Atlas Copco AB","% OF FUNDS*":"0.06%","Industry":"Industrial Machinery & Supplies & Components","COUNTRY":"SE","RANK_WITHIN_COUNTRY":2},
+{"Company":"Volvo AB","% OF FUNDS*":"0.05%","Industry":"Construction Machinery & Heavy Transportation Equipment","COUNTRY":"SE","RANK_WITHIN_COUNTRY":3},
+{"Company":"Sandvik AB","% OF FUNDS*":"0.04%","Industry":"Industrial Machinery & Supplies & Components","COUNTRY":"SE","RANK_WITHIN_COUNTRY":4},
+{"Company":"Assa Abloy AB","% OF FUNDS*":"0.04%","Industry":"Building Products","COUNTRY":"SE","RANK_WITHIN_COUNTRY":5},
+{"Company":"Telefonaktiebolaget LM Ericsson","% OF FUNDS*":"0.03%","Industry":"Communications Equipment","COUNTRY":"SE","RANK_WITHIN_COUNTRY":6},
+{"Company":"Skandinaviska Enskilda Banken AB","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"SE","RANK_WITHIN_COUNTRY":7},
+{"Company":"Swedbank AB","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"SE","RANK_WITHIN_COUNTRY":8},
+{"Company":"Saab AB","% OF FUNDS*":"0.02%","Industry":"Aerospace & Defense","COUNTRY":"SE","RANK_WITHIN_COUNTRY":9},
+{"Company":"Investor AB","% OF FUNDS*":"0.02%","Industry":"Multi-Sector Holdings","COUNTRY":"SE","RANK_WITHIN_COUNTRY":10},
+{"Company":"DBS Group Holdings Ltd","% OF FUNDS*":"0.08%","Industry":"Diversified Banks","COUNTRY":"SG","RANK_WITHIN_COUNTRY":1},
+{"Company":"Oversea-Chinese Banking Corp Ltd","% OF FUNDS*":"0.05%","Industry":"Diversified Banks","COUNTRY":"SG","RANK_WITHIN_COUNTRY":2},
+{"Company":"United Overseas Bank Ltd","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"SG","RANK_WITHIN_COUNTRY":3},
+{"Company":"Singapore Telecommunications Ltd","% OF FUNDS*":"0.03%","Industry":"Integrated Telecommunication Services","COUNTRY":"SG","RANK_WITHIN_COUNTRY":4},
+{"Company":"Keppel Ltd","% OF FUNDS*":"0.02%","Industry":"Industrial Conglomerates","COUNTRY":"SG","RANK_WITHIN_COUNTRY":5},
+{"Company":"Jardine Matheson Holdings Ltd","% OF FUNDS*":"0.01%","Industry":"Industrial Conglomerates","COUNTRY":"SG","RANK_WITHIN_COUNTRY":6},
+{"Company":"Singapore Technologies Engineering Ltd","% OF FUNDS*":"0.01%","Industry":"Aerospace & Defense","COUNTRY":"SG","RANK_WITHIN_COUNTRY":7},
+{"Company":"Singapore Exchange Ltd","% OF FUNDS*":"0.01%","Industry":"Financial Exchanges & Data","COUNTRY":"SG","RANK_WITHIN_COUNTRY":8},
+{"Company":"CapitaLand Integrated Commercial Trust","% OF FUNDS*":"<0.01%","Industry":"Diversified REITs","COUNTRY":"SG","RANK_WITHIN_COUNTRY":9},
+{"Company":"Hongkong Land Holdings Ltd","% OF FUNDS*":"<0.01%","Industry":"Real Estate Operating Companies","COUNTRY":"SG","RANK_WITHIN_COUNTRY":10},
+{"Company":"DELTA ELECTRONICS THAI-FORGN","% OF FUNDS*":"0.02%","Industry":"Electronic Components","COUNTRY":"TH","RANK_WITHIN_COUNTRY":1},
+{"Company":"PTT PCL/FOREIGN","% OF FUNDS*":"0.01%","Industry":"Integrated Oil & Gas","COUNTRY":"TH","RANK_WITHIN_COUNTRY":2},
+{"Company":"ADVANCED INFO SERVICE-FOREIG","% OF FUNDS*":"0.01%","Industry":"Wireless Telecommunication Services","COUNTRY":"TH","RANK_WITHIN_COUNTRY":3},
+{"Company":"KASIKORNBANK PCL-FOREIGN","% OF FUNDS*":"0.01%","Industry":"Diversified Banks","COUNTRY":"TH","RANK_WITHIN_COUNTRY":4},
+{"Company":"CP ALL PCL-FOREIGN","% OF FUNDS*":"<0.01%","Industry":"Food Retail","COUNTRY":"TH","RANK_WITHIN_COUNTRY":5},
+{"Company":"GULF DEVELOPMENT PCL-FOREIGN","% OF FUNDS*":"<0.01%","Industry":"Independent Power Producers & Energy Traders","COUNTRY":"TH","RANK_WITHIN_COUNTRY":6},
+{"Company":"SCB X PCL-FOREIGN","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"TH","RANK_WITHIN_COUNTRY":7},
+{"Company":"BANGKOK DUSIT MED SERVICE-F","% OF FUNDS*":"<0.01%","Industry":"Health Care Facilities","COUNTRY":"TH","RANK_WITHIN_COUNTRY":8},
+{"Company":"AIRPORTS OF THAILAND PCL-FOR","% OF FUNDS*":"<0.01%","Industry":"Airport Services","COUNTRY":"TH","RANK_WITHIN_COUNTRY":9},
+{"Company":"PTT EXPLORATION & PROD-FOR","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Exploration & Production","COUNTRY":"TH","RANK_WITHIN_COUNTRY":10},
+{"Company":"Aselsan Elektronik Sanayi Ve Ticaret AS","% OF FUNDS*":"<0.01%","Industry":"Aerospace & Defense","COUNTRY":"TR","RANK_WITHIN_COUNTRY":1},
+{"Company":"BIM Birlesik Magazalar AS","% OF FUNDS*":"<0.01%","Industry":"Food Retail","COUNTRY":"TR","RANK_WITHIN_COUNTRY":2},
+{"Company":"Akbank TAS","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"TR","RANK_WITHIN_COUNTRY":3},
+{"Company":"KOC Holding AS","% OF FUNDS*":"<0.01%","Industry":"Industrial Conglomerates","COUNTRY":"TR","RANK_WITHIN_COUNTRY":4},
+{"Company":"Turkiye Petrol Rafinerileri AS","% OF FUNDS*":"<0.01%","Industry":"Oil & Gas Refining & Marketing","COUNTRY":"TR","RANK_WITHIN_COUNTRY":5},
+{"Company":"Turk Hava Yollari AO","% OF FUNDS*":"<0.01%","Industry":"Passenger Airlines","COUNTRY":"TR","RANK_WITHIN_COUNTRY":6},
+{"Company":"Turkiye Is Bankasi AS","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"TR","RANK_WITHIN_COUNTRY":7},
+{"Company":"Yapi ve Kredi Bankasi AS","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"TR","RANK_WITHIN_COUNTRY":8},
+{"Company":"Haci Omer Sabanci Holding AS","% OF FUNDS*":"<0.01%","Industry":"Diversified Banks","COUNTRY":"TR","RANK_WITHIN_COUNTRY":9},
+{"Company":"Turkcell Iletisim Hizmetleri AS","% OF FUNDS*":"<0.01%","Industry":"Wireless Telecommunication Services","COUNTRY":"TR","RANK_WITHIN_COUNTRY":10},
+{"Company":"Taiwan Semiconductor Manufacturing Co Ltd","% OF FUNDS*":"1.37%","Industry":"Semiconductors","COUNTRY":"TW","RANK_WITHIN_COUNTRY":1},
+{"Company":"Hon Hai Precision Industry Co Ltd","% OF FUNDS*":"0.08%","Industry":"Electronic Manufacturing Services","COUNTRY":"TW","RANK_WITHIN_COUNTRY":2},
+{"Company":"MediaTek Inc","% OF FUNDS*":"0.08%","Industry":"Semiconductors","COUNTRY":"TW","RANK_WITHIN_COUNTRY":3},
+{"Company":"Delta Electronics Inc","% OF FUNDS*":"0.08%","Industry":"Electronic Components","COUNTRY":"TW","RANK_WITHIN_COUNTRY":4},
+{"Company":"ASE Technology Holding Co Ltd","% OF FUNDS*":"0.04%","Industry":"Semiconductors","COUNTRY":"TW","RANK_WITHIN_COUNTRY":5},
+{"Company":"CTBC Financial Holding Co Ltd","% OF FUNDS*":"0.03%","Industry":"Diversified Banks","COUNTRY":"TW","RANK_WITHIN_COUNTRY":6},
+{"Company":"Fubon Financial Holding Co Ltd","% OF FUNDS*":"0.02%","Industry":"Life & Health Insurance","COUNTRY":"TW","RANK_WITHIN_COUNTRY":7},
+{"Company":"Quanta Computer Inc","% OF FUNDS*":"0.02%","Industry":"Technology Hardware, Storage & Peripherals","COUNTRY":"TW","RANK_WITHIN_COUNTRY":8},
+{"Company":"United Microelectronics Corp","% OF FUNDS*":"0.02%","Industry":"Semiconductors","COUNTRY":"TW","RANK_WITHIN_COUNTRY":9},
+{"Company":"Cathay Financial Holding Co Ltd","% OF FUNDS*":"0.02%","Industry":"Life & Health Insurance","COUNTRY":"TW","RANK_WITHIN_COUNTRY":10},
+{"Company":"NVIDIA Corp","% OF FUNDS*":"3.75%","Industry":"Semiconductors","COUNTRY":"US","RANK_WITHIN_COUNTRY":1},
+{"Company":"Apple Inc","% OF FUNDS*":"3.48%","Industry":"Technology Hardware, Storage & Peripherals","COUNTRY":"US","RANK_WITHIN_COUNTRY":2},
+{"Company":"Microsoft Corp","% OF FUNDS*":"2.63%","Industry":"Systems Software","COUNTRY":"US","RANK_WITHIN_COUNTRY":3},
+{"Company":"Amazon.com Inc","% OF FUNDS*":"1.82%","Industry":"Broadline Retail","COUNTRY":"US","RANK_WITHIN_COUNTRY":4},
+{"Company":"Alphabet Inc","% OF FUNDS*":"1.64%","Industry":"Interactive Media & Services","COUNTRY":"US","RANK_WITHIN_COUNTRY":5},
+{"Company":"Broadcom Inc","% OF FUNDS*":"1.33%","Industry":"Semiconductors","COUNTRY":"US","RANK_WITHIN_COUNTRY":6},
+{"Company":"Alphabet Inc","% OF FUNDS*":"1.33%","Industry":"Interactive Media & Services","COUNTRY":"US","RANK_WITHIN_COUNTRY":7},
+{"Company":"Meta Platforms Inc","% OF FUNDS*":"1.28%","Industry":"Interactive Media & Services","COUNTRY":"US","RANK_WITHIN_COUNTRY":8},
+{"Company":"Tesla Inc","% OF FUNDS*":"1.03%","Industry":"Automobile Manufacturers","COUNTRY":"US","RANK_WITHIN_COUNTRY":9},
+{"Company":"Eli Lilly & Co","% OF FUNDS*":"0.76%","Industry":"Pharmaceuticals","COUNTRY":"US","RANK_WITHIN_COUNTRY":10},
+{"Company":"Anglogold Ashanti Plc","% OF FUNDS*":"0.05%","Industry":"Gold","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":1},
+{"Company":"Gold Fields Ltd","% OF FUNDS*":"0.05%","Industry":"Gold","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":2},
+{"Company":"Naspers Ltd","% OF FUNDS*":"0.04%","Industry":"Broadline Retail","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":3},
+{"Company":"FirstRand Ltd","% OF FUNDS*":"0.03%","Industry":"Diversified Financial Services","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":4},
+{"Company":"Valterra Platinum Ltd","% OF FUNDS*":"0.03%","Industry":"Precious Metals & Minerals","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":5},
+{"Company":"Standard Bank Group Ltd","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":6},
+{"Company":"Capitec Bank Holdings Ltd","% OF FUNDS*":"0.02%","Industry":"Diversified Banks","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":7},
+{"Company":"MTN Group Ltd","% OF FUNDS*":"0.02%","Industry":"Wireless Telecommunication Services","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":8},
+{"Company":"Impala Platinum Holdings Ltd","% OF FUNDS*":"0.02%","Industry":"Precious Metals & Minerals","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":9},
+{"Company":"Harmony Gold Mining Co Ltd","% OF FUNDS*":"0.01%","Industry":"Gold","COUNTRY":"ZA","RANK_WITHIN_COUNTRY":10}
+    ];
+
+    // Plotly Config
+    const data = [{
+        type: 'choropleth',
+        locations: locations,
+        z: weights,
+        text: hoverTexts,
+        hoverinfo: 'text',
+        colorscale: [
+            [0, '#e3f2fd'],
+            [0.005, '#bbdefb'], // Light blue for small weights
+            [0.05, '#64b5f6'],
+            [0.1, '#2196f3'],
+            [1, '#0d47a1']     // Dark blue for USA
+        ],
+        autocolorscale: false,
+        marker: { line: { color: 'white', width: 0.5 } },
+        colorbar: { title: 'Weight %', thickness: 15, len: 0.5 }
+    }];
+
+    const layout = {
+        geo: {
+            showframe: false,
+            projection: { type: 'equal earth' },
+            landcolor: '#e2e8f0',
+            showcountries: true,
+            countrycolor: '#cbd5e0'
+        },
+        margin: { l: 0, r: 0, t: 0, b: 0 }
+    };
+
+    Plotly.newPlot('map-container', data, layout, { responsive: true, displayModeBar: false });
+
+    // Click Event Handler
+    document.getElementById('map-container').on('plotly_click', function(data) {
+        const iso3 = data.points[0].location;
+        // Reverse lookup: Find 2-digit code from 3-digit code
+        const iso2 = Object.keys(isoMapping).find(key => isoMapping[key] === iso3);
+        
+        if (iso2) {
+            updateCompanyTable(iso2);
+        }
+    });
+
+    function updateCompanyTable(iso2) {
+        const container = document.getElementById('table-content');
+        const title = document.getElementById('country-title');
+        
+        // Filter the user's pasted list
+        const filtered = companyList.filter(c => c.COUNTRY === iso2)
+                                    .sort((a, b) => a.RANK_WITHIN_COUNTRY - b.RANK_WITHIN_COUNTRY)
+                                    .slice(0, 10);
+
+        title.innerText = `Top 10 Constituents: ${iso2}`;
+
+        if (filtered.length === 0) {
+            container.innerHTML = `<div class="empty-state">No company data found for ${iso2} in the provided list.</div>`;
+            return;
+        }
+
+        let html = `<table><thead><tr>
+            <th>Rank</th>
+            <th>Company</th>
+            <th>Industry</th>
+            <th>% of Total Index</th>
+        </tr></thead><tbody>`;
+
+        filtered.forEach(item => {
+            html += `<tr>
+                <td>${item.RANK_WITHIN_COUNTRY}</td>
+                <td><strong>${item.Company}</strong></td>
+                <td>${item.Industry}</td>
+                <td>${item["% OF FUNDS*"]}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+        
+        // Auto-scroll to table on mobile
+        document.getElementById('details-view').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function setProjection(type, btnId) {
+        Plotly.relayout('map-container', { 'geo.projection.type': type });
+        document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+        document.getElementById(btnId).classList.add('active');
+    }
+
+    window.onresize = () => Plotly.Plots.resize('map-container');
+</script>
+
+</body>
+</html>

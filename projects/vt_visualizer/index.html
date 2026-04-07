@@ -60,7 +60,7 @@
         }
         .legend-item { display: flex; align-items: center; margin: 5px 15px; }
         .color-box { width: 18px; height: 18px; margin-right: 8px; border-radius: 3px; }
-        
+
         .details-container {
             max-width: 1100px;
             margin: 20px auto;
@@ -109,13 +109,13 @@
 
 <script>
     const isoMapping = {
-        "AU": "AUS", "AT": "AUT", "BE": "BEL", "BR": "BRA", "CA": "CAN", "CL": "CHL", 
-        "CN": "CHN", "CO": "COL", "CZ": "CZE", "DK": "DNK", "EG": "EGY", "FI": "FIN", 
-        "FR": "FRA", "DE": "DEU", "GR": "GRC", "HK": "HKG", "HU": "HUN", "IS": "ISL", 
-        "IN": "IND", "ID": "IDN", "IE": "IRL", "IL": "ISR", "IT": "ITA", "JP": "JPN", 
-        "KR": "KOR", "KW": "KWT", "MY": "MYS", "MX": "MEX", "NL": "NLD", "NZ": "NZL", 
-        "NO": "NOR", "PH": "PHL", "PL": "POL", "PT": "PRT", "QA": "QAT", "RO": "ROU", 
-        "SA": "SAU", "SG": "SGP", "ZA": "ZAF", "ES": "ESP", "SE": "SWE", "CH": "CHE", 
+        "AU": "AUS", "AT": "AUT", "BE": "BEL", "BR": "BRA", "CA": "CAN", "CL": "CHL",
+        "CN": "CHN", "CO": "COL", "CZ": "CZE", "DK": "DNK", "EG": "EGY", "FI": "FIN",
+        "FR": "FRA", "DE": "DEU", "GR": "GRC", "HK": "HKG", "HU": "HUN", "IS": "ISL",
+        "IN": "IND", "ID": "IDN", "IE": "IRL", "IL": "ISR", "IT": "ITA", "JP": "JPN",
+        "KR": "KOR", "KW": "KWT", "MY": "MYS", "MX": "MEX", "NL": "NLD", "NZ": "NZL",
+        "NO": "NOR", "PH": "PHL", "PL": "POL", "PT": "PRT", "QA": "QAT", "RO": "ROU",
+        "SA": "SAU", "SG": "SGP", "ZA": "ZAF", "ES": "ESP", "SE": "SWE", "CH": "CHE",
         "TW": "TWN", "TH": "THA", "TR": "TUR", "AE": "ARE", "GB": "GBR", "US": "USA"
     };
 
@@ -672,24 +672,24 @@
     // Universal Click Handler
     document.getElementById('map-container').on('plotly_click', function(data) {
         let iso2 = "";
-        
+
         // If clicking a bubble (scattergeo)
         if (data.points[0].data.type === 'scattergeo') {
             iso2 = data.points[0].customdata;
-        } 
+        }
         // If clicking a country polygon (choropleth)
         else {
             const iso3 = data.points[0].location;
             iso2 = Object.keys(isoMapping).find(key => isoMapping[key] === iso3);
         }
-        
+
         if (iso2) updateCompanyTable(iso2);
     });
 
     function updateCompanyTable(iso2) {
         const container = document.getElementById('table-content');
         const title = document.getElementById('country-title');
-        
+
         const filtered = companyList.filter(c => c.COUNTRY === iso2)
                                     .sort((a, b) => a.RANK_WITHIN_COUNTRY - b.RANK_WITHIN_COUNTRY)
                                     .slice(0, 10);

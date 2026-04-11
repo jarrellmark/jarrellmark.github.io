@@ -10683,18 +10683,27 @@
 
         updateIndustryPieChart(iso2, filtered);
 
-        // Limit display for Global if it's too large? 
-        // User asked for "every single company", but 10k might be slow.
-        // Let's try it first.
+        const MAX_DISPLAY = 500;
+        const displayList = filtered.slice(0, MAX_DISPLAY);
+        const isTruncated = filtered.length > MAX_DISPLAY;
+        
+        if (isTruncated) {
+            title.innerText += ` (Top ${MAX_DISPLAY})`;
+        }
         
         let html = `<table><thead><tr><th>Rank</th><th>Company</th><th>Industry</th><th>Country</th><th>% of Total Index</th></tr></thead><tbody>`;
-        filtered.forEach((item, index) => {
+        displayList.forEach((item, index) => {
             const emoji = industryEmojiMap[item.Industry] || "";
-            const formattedPercent = (item["% of Index"] * 100).toFixed(2) + "%";
+            const formattedPercent = (item["% of Index"] * 100).toFixed(4) + "%";
             const rank = iso2 ? item['Rank Within Country'] : (index + 1);
             html += `<tr><td>${rank}</td><td><strong>${item.Company}</strong></td><td>${emoji} ${item.Industry}</td><td>${item.Country}</td><td>${formattedPercent}</td></tr>`;
         });
         html += `</tbody></table>`;
+        
+        if (isTruncated) {
+            html += `<div style="text-align: center; padding: 20px; color: #718096; font-style: italic; border-top: 1px solid #edf2f7;">... and ${filtered.length - MAX_DISPLAY} more companies.</div>`;
+        }
+
         container.innerHTML = html;
         
         // Only scroll if a specific country was selected (manual click)
